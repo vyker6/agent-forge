@@ -516,16 +516,213 @@ function AgentConfigForm({
   );
 }
 
+function SkillFormFields({
+  form,
+  setForm,
+}: {
+  form: {
+    name: string;
+    description: string;
+    instructions: string;
+    context: string;
+    allowedTools: string[];
+    argumentHint: string;
+    agentType: string;
+    model: string;
+    disableModelInvocation: string;
+    userInvocable: string;
+  };
+  setForm: (updater: (prev: typeof form) => typeof form) => void;
+}) {
+  const toggleSkillTool = (tool: string) => {
+    setForm((prev) => ({
+      ...prev,
+      allowedTools: prev.allowedTools.includes(tool)
+        ? prev.allowedTools.filter((t) => t !== tool)
+        : [...prev.allowedTools, tool],
+    }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+            placeholder="e.g. pdf-processing"
+            data-testid="input-skill-name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Context</Label>
+          <Select
+            value={form.context}
+            onValueChange={(v) => setForm((s) => ({ ...s, context: v }))}
+          >
+            <SelectTrigger data-testid="select-skill-context">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="main">Main</SelectItem>
+              <SelectItem value="fork">Fork (Separate Context)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Description</Label>
+        <Input
+          value={form.description}
+          onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+          placeholder="When to use this skill"
+          data-testid="input-skill-description"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Argument Hint</Label>
+        <Input
+          value={form.argumentHint}
+          onChange={(e) => setForm((s) => ({ ...s, argumentHint: e.target.value }))}
+          placeholder="[file-path]"
+          data-testid="input-skill-argument-hint"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Instructions (SKILL.md content)</Label>
+        <Textarea
+          value={form.instructions}
+          onChange={(e) => setForm((s) => ({ ...s, instructions: e.target.value }))}
+          placeholder="# Skill Instructions&#10;&#10;Describe what this skill does and how to use it..."
+          className="min-h-[150px] font-mono text-sm"
+          data-testid="textarea-skill-instructions"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label>Allowed Tools</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Select which tools this skill can use
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {AVAILABLE_TOOLS.map((tool) => (
+            <Badge
+              key={tool}
+              variant={form.allowedTools.includes(tool) ? "default" : "outline"}
+              className={`cursor-pointer toggle-elevate ${form.allowedTools.includes(tool) ? "toggle-elevated" : ""}`}
+              onClick={() => toggleSkillTool(tool)}
+              data-testid={`badge-skill-tool-${tool}`}
+            >
+              {tool}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Model</Label>
+          <Select
+            value={form.model}
+            onValueChange={(v) => setForm((s) => ({ ...s, model: v }))}
+          >
+            <SelectTrigger data-testid="select-skill-model">
+              <SelectValue placeholder="Inherit (Default)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Inherit (Default)</SelectItem>
+              <SelectItem value="sonnet">Claude Sonnet</SelectItem>
+              <SelectItem value="opus">Claude Opus</SelectItem>
+              <SelectItem value="haiku">Claude Haiku</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {form.context === "fork" && (
+          <div className="space-y-2">
+            <Label>Agent Type</Label>
+            <Select
+              value={form.agentType}
+              onValueChange={(v) => setForm((s) => ({ ...s, agentType: v }))}
+            >
+              <SelectTrigger data-testid="select-skill-agent-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general-purpose">General Purpose</SelectItem>
+                <SelectItem value="Explore">Explore</SelectItem>
+                <SelectItem value="Plan">Plan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Disable auto-invocation</Label>
+            <p className="text-xs text-muted-foreground">
+              Prevent the model from automatically invoking this skill
+            </p>
+          </div>
+          <Switch
+            checked={form.disableModelInvocation === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, disableModelInvocation: checked ? "true" : "false" }))
+            }
+            data-testid="switch-skill-disable-invocation"
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>User invocable (show in / menu)</Label>
+            <p className="text-xs text-muted-foreground">
+              Allow users to invoke this skill from the slash command menu
+            </p>
+          </div>
+          <Switch
+            checked={form.userInvocable === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, userInvocable: checked ? "true" : "false" }))
+            }
+            data-testid="switch-skill-user-invocable"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
   const { toast } = useToast();
   const [showNew, setShowNew] = useState(false);
-  const [newSkill, setNewSkill] = useState({
+  const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+
+  const emptySkillForm = {
     name: "",
     description: "",
     instructions: "",
     context: "main",
     allowedTools: [] as string[],
-  });
+    argumentHint: "",
+    agentType: "general-purpose",
+    model: "",
+    disableModelInvocation: "false",
+    userInvocable: "true",
+  };
+
+  const [newSkill, setNewSkill] = useState(emptySkillForm);
+  const [editForm, setEditForm] = useState(emptySkillForm);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof newSkill) => {
@@ -535,8 +732,24 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "skills"] });
       setShowNew(false);
-      setNewSkill({ name: "", description: "", instructions: "", context: "main", allowedTools: [] });
+      setNewSkill({ ...emptySkillForm, allowedTools: [] });
       toast({ title: "Skill created" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof editForm & { id: string }) => {
+      const { id, ...body } = data;
+      const res = await apiRequest("PATCH", `/api/skills/${id}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "skills"] });
+      setEditingSkillId(null);
+      toast({ title: "Skill updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating skill", description: err.message, variant: "destructive" });
     },
   });
 
@@ -549,6 +762,22 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
       toast({ title: "Skill deleted" });
     },
   });
+
+  const startEditing = (skill: Skill) => {
+    setEditingSkillId(skill.id);
+    setEditForm({
+      name: skill.name,
+      description: skill.description,
+      instructions: skill.instructions,
+      context: skill.context,
+      allowedTools: [...skill.allowedTools],
+      argumentHint: skill.argumentHint,
+      agentType: skill.agentType,
+      model: skill.model,
+      disableModelInvocation: skill.disableModelInvocation,
+      userInvocable: skill.userInvocable,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -568,53 +797,16 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
       {showNew && (
         <Card>
           <CardContent className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={newSkill.name}
-                  onChange={(e) => setNewSkill((s) => ({ ...s, name: e.target.value }))}
-                  placeholder="e.g. pdf-processing"
-                  data-testid="input-skill-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Context</Label>
-                <Select
-                  value={newSkill.context}
-                  onValueChange={(v) => setNewSkill((s) => ({ ...s, context: v }))}
-                >
-                  <SelectTrigger data-testid="select-skill-context">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="main">Main</SelectItem>
-                    <SelectItem value="fork">Fork (Separate Context)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                value={newSkill.description}
-                onChange={(e) => setNewSkill((s) => ({ ...s, description: e.target.value }))}
-                placeholder="When to use this skill"
-                data-testid="input-skill-description"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Instructions (SKILL.md content)</Label>
-              <Textarea
-                value={newSkill.instructions}
-                onChange={(e) => setNewSkill((s) => ({ ...s, instructions: e.target.value }))}
-                placeholder="# Skill Instructions&#10;&#10;Describe what this skill does and how to use it..."
-                className="min-h-[150px] font-mono text-sm"
-                data-testid="textarea-skill-instructions"
-              />
-            </div>
+            <SkillFormFields form={newSkill} setForm={setNewSkill} />
             <div className="flex items-center gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowNew(false)} data-testid="button-cancel-skill">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowNew(false);
+                  setNewSkill({ ...emptySkillForm, allowedTools: [] });
+                }}
+                data-testid="button-cancel-skill"
+              >
                 Cancel
               </Button>
               <Button
@@ -641,31 +833,74 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
           {skills.map((skill) => (
             <Card key={skill.id} data-testid={`card-skill-${skill.id}`}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
-                      <Puzzle className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-sm">{skill.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">{skill.description}</p>
-                      {skill.instructions && (
-                        <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-24 font-mono">
-                          {skill.instructions.slice(0, 200)}
-                          {skill.instructions.length > 200 ? "..." : ""}
-                        </pre>
-                      )}
+                {editingSkillId === skill.id ? (
+                  <div className="space-y-4">
+                    <SkillFormFields form={editForm} setForm={setEditForm} />
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setEditingSkillId(null)}
+                        data-testid="button-cancel-edit-skill"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => updateMutation.mutate({ ...editForm, id: skill.id })}
+                        disabled={!editForm.name.trim() || updateMutation.isPending}
+                        data-testid="button-save-edit-skill"
+                      >
+                        {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteMutation.mutate(skill.id)}
-                    data-testid={`button-delete-skill-${skill.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                      onClick={() => startEditing(skill)}
+                    >
+                      <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
+                        <Puzzle className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-medium text-sm">{skill.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">{skill.description}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          <Badge variant="secondary" className="text-[10px]">{skill.context}</Badge>
+                          {skill.model && (
+                            <Badge variant="secondary" className="text-[10px]">model: {skill.model}</Badge>
+                          )}
+                          {skill.context === "fork" && (
+                            <Badge variant="secondary" className="text-[10px]">{skill.agentType}</Badge>
+                          )}
+                          {skill.disableModelInvocation === "true" && (
+                            <Badge variant="outline" className="text-[10px]">Auto-invoke: off</Badge>
+                          )}
+                          {skill.userInvocable === "false" && (
+                            <Badge variant="outline" className="text-[10px]">Hidden from menu</Badge>
+                          )}
+                        </div>
+                        {skill.instructions && (
+                          <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-24 font-mono">
+                            {skill.instructions.slice(0, 200)}
+                            {skill.instructions.length > 200 ? "..." : ""}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMutation.mutate(skill.id);
+                      }}
+                      data-testid={`button-delete-skill-${skill.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
