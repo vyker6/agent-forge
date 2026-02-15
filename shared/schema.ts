@@ -10,7 +10,11 @@ export const agents = pgTable("agents", {
   systemPrompt: text("system_prompt").notNull().default(""),
   model: text("model").notNull().default("sonnet"),
   tools: text("tools").array().notNull().default(sql`ARRAY[]::text[]`),
+  disallowedTools: text("disallowed_tools").array().notNull().default(sql`ARRAY[]::text[]`),
   memoryScope: text("memory_scope").notNull().default("project"),
+  permissionMode: text("permission_mode").notNull().default("default"),
+  maxTurns: integer("max_turns"),
+  preloadedSkills: text("preloaded_skills").array().notNull().default(sql`ARRAY[]::text[]`),
   icon: text("icon").notNull().default("bot"),
   color: text("color").notNull().default("#3b82f6"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -24,6 +28,11 @@ export const skills = pgTable("skills", {
   instructions: text("instructions").notNull().default(""),
   context: text("context").notNull().default("main"),
   allowedTools: text("allowed_tools").array().notNull().default(sql`ARRAY[]::text[]`),
+  argumentHint: text("argument_hint").notNull().default(""),
+  disableModelInvocation: text("disable_model_invocation").notNull().default("false"),
+  userInvocable: text("user_invocable").notNull().default("true"),
+  model: text("model").notNull().default(""),
+  agentType: text("agent_type").notNull().default("general-purpose"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -33,6 +42,13 @@ export const commands = pgTable("commands", {
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   promptTemplate: text("prompt_template").notNull().default(""),
+  argumentHint: text("argument_hint").notNull().default(""),
+  disableModelInvocation: text("disable_model_invocation").notNull().default("false"),
+  userInvocable: text("user_invocable").notNull().default("true"),
+  model: text("model").notNull().default(""),
+  context: text("context").notNull().default(""),
+  agentType: text("agent_type").notNull().default(""),
+  allowedTools: text("allowed_tools").array().notNull().default(sql`ARRAY[]::text[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -86,6 +102,7 @@ export const AVAILABLE_TOOLS = [
 ] as const;
 
 export const AVAILABLE_MODELS = [
+  { value: "inherit", label: "Inherit (Default)" },
   { value: "sonnet", label: "Claude Sonnet" },
   { value: "opus", label: "Claude Opus" },
   { value: "haiku", label: "Claude Haiku" },
@@ -95,6 +112,15 @@ export const MEMORY_SCOPES = [
   { value: "user", label: "User (Global)" },
   { value: "project", label: "Project" },
   { value: "local", label: "Local" },
+] as const;
+
+export const PERMISSION_MODES = [
+  { value: "default", label: "Default" },
+  { value: "acceptEdits", label: "Accept Edits" },
+  { value: "delegate", label: "Delegate" },
+  { value: "dontAsk", label: "Don't Ask" },
+  { value: "bypassPermissions", label: "Bypass Permissions" },
+  { value: "plan", label: "Plan Mode" },
 ] as const;
 
 export const AGENT_ICONS = [
