@@ -105,7 +105,7 @@ export function AgentIconPicker({
               className={`w-6 h-6 rounded-full transition-transform ${
                 selectedColor === c ? "ring-2 ring-offset-2 ring-offset-background" : ""
               }`}
-              style={{ backgroundColor: c, ringColor: c }}
+              style={{ backgroundColor: c, "--tw-ring-color": c } as React.CSSProperties}
               data-testid={`button-color-${c}`}
             />
           ))}
