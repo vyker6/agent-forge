@@ -6,7 +6,7 @@ import {
   FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File
 } from "lucide-react";
 import type { Agent, Skill, Command, FileMapEntry, InsertAgent } from "@shared/schema";
-import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES } from "@shared/schema";
+import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES, PERMISSION_MODES } from "@shared/schema";
 import { AgentIcon, AgentIconPicker } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +32,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +50,11 @@ export default function AgentEditorPage() {
     systemPrompt: "",
     model: "sonnet",
     tools: [],
+    disallowedTools: [],
     memoryScope: "project",
+    permissionMode: "default",
+    maxTurns: null,
+    preloadedSkills: [],
     icon: "bot",
     color: "#3b82f6",
   });
@@ -82,7 +87,11 @@ export default function AgentEditorPage() {
         systemPrompt: agent.systemPrompt,
         model: agent.model,
         tools: agent.tools,
+        disallowedTools: agent.disallowedTools,
         memoryScope: agent.memoryScope,
+        permissionMode: agent.permissionMode,
+        maxTurns: agent.maxTurns,
+        preloadedSkills: agent.preloadedSkills,
         icon: agent.icon,
         color: agent.color,
       });
@@ -122,9 +131,18 @@ export default function AgentEditorPage() {
   const toggleTool = (tool: string) => {
     setForm((prev) => ({
       ...prev,
-      tools: prev.tools.includes(tool)
-        ? prev.tools.filter((t) => t !== tool)
-        : [...prev.tools, tool],
+      tools: (prev.tools ?? []).includes(tool)
+        ? (prev.tools ?? []).filter((t) => t !== tool)
+        : [...(prev.tools ?? []), tool],
+    }));
+  };
+
+  const toggleDisallowedTool = (tool: string) => {
+    setForm((prev) => ({
+      ...prev,
+      disallowedTools: (prev.disallowedTools ?? []).includes(tool)
+        ? (prev.disallowedTools ?? []).filter((t: string) => t !== tool)
+        : [...(prev.disallowedTools ?? []), tool],
     }));
   };
 
@@ -144,7 +162,7 @@ export default function AgentEditorPage() {
           <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <AgentIcon icon={form.icon} color={form.color} size="md" className="p-1.5 shrink-0" />
+          <AgentIcon icon={form.icon ?? "bot"} color={form.color ?? "#3b82f6"} size="md" className="p-1.5 shrink-0" />
           <div className="min-w-0">
             <h1 className="text-lg font-semibold truncate" data-testid="text-editor-title">
               {isNew ? "New Agent" : form.name || "Untitled"}
@@ -218,6 +236,8 @@ export default function AgentEditorPage() {
                 form={form}
                 setForm={setForm}
                 toggleTool={toggleTool}
+                toggleDisallowedTool={toggleDisallowedTool}
+                skills={skills}
               />
             </TabsContent>
 
@@ -245,10 +265,14 @@ function AgentConfigForm({
   form,
   setForm,
   toggleTool,
+  toggleDisallowedTool,
+  skills,
 }: {
   form: InsertAgent;
   setForm: React.Dispatch<React.SetStateAction<InsertAgent>>;
   toggleTool: (tool: string) => void;
+  toggleDisallowedTool: (tool: string) => void;
+  skills: Skill[];
 }) {
   return (
     <div className="space-y-6">
@@ -278,8 +302,8 @@ function AgentConfigForm({
         <Card>
           <CardContent className="p-4">
             <AgentIconPicker
-              selectedIcon={form.icon}
-              selectedColor={form.color}
+              selectedIcon={form.icon ?? "bot"}
+              selectedColor={form.color ?? "#3b82f6"}
               onIconChange={(icon) => setForm((f) => ({ ...f, icon }))}
               onColorChange={(color) => setForm((f) => ({ ...f, color }))}
             />
@@ -358,8 +382,8 @@ function AgentConfigForm({
           {AVAILABLE_TOOLS.map((tool) => (
             <Badge
               key={tool}
-              variant={form.tools.includes(tool) ? "default" : "outline"}
-              className={`cursor-pointer toggle-elevate ${form.tools.includes(tool) ? "toggle-elevated" : ""}`}
+              variant={(form.tools ?? []).includes(tool) ? "default" : "outline"}
+              className={`cursor-pointer toggle-elevate ${(form.tools ?? []).includes(tool) ? "toggle-elevated" : ""}`}
               onClick={() => toggleTool(tool)}
               data-testid={`badge-tool-${tool}`}
             >
@@ -386,6 +410,108 @@ function AgentConfigForm({
           </Button>
         </div>
       </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <div>
+          <Label>Disallowed Tools</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Tools this agent is explicitly denied from using
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {AVAILABLE_TOOLS.map((tool) => (
+            <Badge
+              key={tool}
+              variant={(form.disallowedTools ?? []).includes(tool) ? "destructive" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleDisallowedTool(tool)}
+            >
+              {tool}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <Label>Permission Mode</Label>
+          <p className="text-xs text-muted-foreground">
+            How the agent handles permission requests
+          </p>
+          <Select
+            value={form.permissionMode ?? "default"}
+            onValueChange={(v) => setForm((f) => ({ ...f, permissionMode: v }))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERMISSION_MODES.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Max Turns</Label>
+          <p className="text-xs text-muted-foreground">
+            Limit agentic turns (blank = unlimited)
+          </p>
+          <Input
+            type="number"
+            min={1}
+            value={form.maxTurns ?? ""}
+            onChange={(e) => setForm((f) => ({
+              ...f,
+              maxTurns: e.target.value ? parseInt(e.target.value, 10) : null,
+            }))}
+            placeholder="Unlimited"
+          />
+        </div>
+      </div>
+
+      {skills.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div>
+              <Label>Preloaded Skills</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Skills whose content is injected into this agent&apos;s context at startup
+              </p>
+            </div>
+            <div className="space-y-2">
+              {skills.map((skill) => {
+                const slug = skill.name.toLowerCase().replace(/\s+/g, "-");
+                const checked = (form.preloadedSkills ?? []).includes(slug);
+                return (
+                  <label key={skill.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(val) => {
+                        setForm((f) => ({
+                          ...f,
+                          preloadedSkills: val
+                            ? [...(f.preloadedSkills ?? []), slug]
+                            : (f.preloadedSkills ?? []).filter((s: string) => s !== slug),
+                        }));
+                      }}
+                    />
+                    <span className="text-sm">{skill.name}</span>
+                    <span className="text-xs text-muted-foreground">({slug})</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
