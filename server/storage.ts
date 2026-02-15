@@ -25,10 +25,12 @@ export interface IStorage {
   getSkills(agentId: string): Promise<Skill[]>;
   createSkill(data: InsertSkill): Promise<Skill>;
   deleteSkill(id: string): Promise<void>;
+  updateSkill(id: string, data: Partial<InsertSkill>): Promise<Skill | undefined>;
 
   getCommands(agentId: string): Promise<Command[]>;
   createCommand(data: InsertCommand): Promise<Command>;
   deleteCommand(id: string): Promise<void>;
+  updateCommand(id: string, data: Partial<InsertCommand>): Promise<Command | undefined>;
 
   getFileMapEntries(agentId: string): Promise<FileMapEntry[]>;
   createFileMapEntry(data: InsertFileMapEntry): Promise<FileMapEntry>;
@@ -88,6 +90,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(skills).where(eq(skills.id, id));
   }
 
+  async updateSkill(id: string, data: Partial<InsertSkill>): Promise<Skill | undefined> {
+    const [skill] = await db.update(skills).set(data).where(eq(skills.id, id)).returning();
+    return skill;
+  }
+
   async getCommands(agentId: string): Promise<Command[]> {
     return db.select().from(commands).where(eq(commands.agentId, agentId)).orderBy(commands.createdAt);
   }
@@ -99,6 +106,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCommand(id: string): Promise<void> {
     await db.delete(commands).where(eq(commands.id, id));
+  }
+
+  async updateCommand(id: string, data: Partial<InsertCommand>): Promise<Command | undefined> {
+    const [cmd] = await db.update(commands).set(data).where(eq(commands.id, id)).returning();
+    return cmd;
   }
 
   async getFileMapEntries(agentId: string): Promise<FileMapEntry[]> {

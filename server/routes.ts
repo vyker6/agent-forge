@@ -62,6 +62,14 @@ export async function registerRoutes(
     res.status(201).json(skill);
   });
 
+  app.patch("/api/skills/:id", async (req, res) => {
+    const parsed = insertSkillSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const skill = await storage.updateSkill(req.params.id, parsed.data);
+    if (!skill) return res.status(404).json({ error: "Skill not found" });
+    res.json(skill);
+  });
+
   app.delete("/api/skills/:id", async (req, res) => {
     await storage.deleteSkill(req.params.id);
     res.status(204).end();
@@ -78,6 +86,14 @@ export async function registerRoutes(
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
     const cmd = await storage.createCommand(parsed.data);
     res.status(201).json(cmd);
+  });
+
+  app.patch("/api/commands/:id", async (req, res) => {
+    const parsed = insertCommandSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const cmd = await storage.updateCommand(req.params.id, parsed.data);
+    if (!cmd) return res.status(404).json({ error: "Command not found" });
+    res.json(cmd);
   });
 
   app.delete("/api/commands/:id", async (req, res) => {
