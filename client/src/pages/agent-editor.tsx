@@ -910,10 +910,222 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
   );
 }
 
+function CommandFormFields({
+  form,
+  setForm,
+}: {
+  form: {
+    name: string;
+    description: string;
+    promptTemplate: string;
+    argumentHint: string;
+    context: string;
+    agentType: string;
+    allowedTools: string[];
+    model: string;
+    disableModelInvocation: string;
+    userInvocable: string;
+  };
+  setForm: (updater: (prev: typeof form) => typeof form) => void;
+}) {
+  const toggleCommandTool = (tool: string) => {
+    setForm((prev) => ({
+      ...prev,
+      allowedTools: prev.allowedTools.includes(tool)
+        ? prev.allowedTools.filter((t) => t !== tool)
+        : [...prev.allowedTools, tool],
+    }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Command Name</Label>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-muted-foreground">/</span>
+            <Input
+              value={form.name}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, name: e.target.value.replace(/\s+/g, "-").toLowerCase() }))
+              }
+              placeholder="review-code"
+              data-testid="input-command-name"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Description</Label>
+          <Input
+            value={form.description}
+            onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+            placeholder="What this command does"
+            data-testid="input-command-description"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Argument Hint</Label>
+        <Input
+          value={form.argumentHint}
+          onChange={(e) => setForm((s) => ({ ...s, argumentHint: e.target.value }))}
+          placeholder="[PR-number]"
+          data-testid="input-command-argument-hint"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Prompt Template</Label>
+        <Textarea
+          value={form.promptTemplate}
+          onChange={(e) => setForm((s) => ({ ...s, promptTemplate: e.target.value }))}
+          placeholder="Review the following code for security vulnerabilities and best practices..."
+          className="min-h-[120px] font-mono text-sm"
+          data-testid="textarea-command-template"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Context</Label>
+          <Select
+            value={form.context}
+            onValueChange={(v) => setForm((s) => ({ ...s, context: v }))}
+          >
+            <SelectTrigger data-testid="select-command-context">
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">None</SelectItem>
+              <SelectItem value="main">Main</SelectItem>
+              <SelectItem value="fork">Fork (Separate Context)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {form.context === "fork" && (
+          <div className="space-y-2">
+            <Label>Agent Type</Label>
+            <Select
+              value={form.agentType}
+              onValueChange={(v) => setForm((s) => ({ ...s, agentType: v }))}
+            >
+              <SelectTrigger data-testid="select-command-agent-type">
+                <SelectValue placeholder="Default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Default</SelectItem>
+                <SelectItem value="general-purpose">General Purpose</SelectItem>
+                <SelectItem value="Explore">Explore</SelectItem>
+                <SelectItem value="Plan">Plan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label>Allowed Tools</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Select which tools this command can use
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {AVAILABLE_TOOLS.map((tool) => (
+            <Badge
+              key={tool}
+              variant={form.allowedTools.includes(tool) ? "default" : "outline"}
+              className={`cursor-pointer toggle-elevate ${form.allowedTools.includes(tool) ? "toggle-elevated" : ""}`}
+              onClick={() => toggleCommandTool(tool)}
+              data-testid={`badge-command-tool-${tool}`}
+            >
+              {tool}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Model</Label>
+          <Select
+            value={form.model}
+            onValueChange={(v) => setForm((s) => ({ ...s, model: v }))}
+          >
+            <SelectTrigger data-testid="select-command-model">
+              <SelectValue placeholder="Inherit (Default)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Inherit (Default)</SelectItem>
+              <SelectItem value="sonnet">Claude Sonnet</SelectItem>
+              <SelectItem value="opus">Claude Opus</SelectItem>
+              <SelectItem value="haiku">Claude Haiku</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Disable auto-invocation</Label>
+            <p className="text-xs text-muted-foreground">
+              Prevent the model from automatically invoking this command
+            </p>
+          </div>
+          <Switch
+            checked={form.disableModelInvocation === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, disableModelInvocation: checked ? "true" : "false" }))
+            }
+            data-testid="switch-command-disable-invocation"
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>User invocable (show in / menu)</Label>
+            <p className="text-xs text-muted-foreground">
+              Allow users to invoke this command from the slash command menu
+            </p>
+          </div>
+          <Switch
+            checked={form.userInvocable === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, userInvocable: checked ? "true" : "false" }))
+            }
+            data-testid="switch-command-user-invocable"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CommandsTab({ agentId, commands }: { agentId: string; commands: Command[] }) {
   const { toast } = useToast();
   const [showNew, setShowNew] = useState(false);
-  const [newCmd, setNewCmd] = useState({ name: "", description: "", promptTemplate: "" });
+  const [editingCommandId, setEditingCommandId] = useState<string | null>(null);
+
+  const emptyCommandForm = {
+    name: "",
+    description: "",
+    promptTemplate: "",
+    argumentHint: "",
+    context: "",
+    agentType: "",
+    allowedTools: [] as string[],
+    model: "",
+    disableModelInvocation: "false",
+    userInvocable: "true",
+  };
+
+  const [newCmd, setNewCmd] = useState(emptyCommandForm);
+  const [editForm, setEditForm] = useState(emptyCommandForm);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof newCmd) => {
@@ -923,8 +1135,24 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "commands"] });
       setShowNew(false);
-      setNewCmd({ name: "", description: "", promptTemplate: "" });
+      setNewCmd({ ...emptyCommandForm, allowedTools: [] });
       toast({ title: "Command created" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof editForm & { id: string }) => {
+      const { id, ...body } = data;
+      const res = await apiRequest("PATCH", `/api/commands/${id}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "commands"] });
+      setEditingCommandId(null);
+      toast({ title: "Command updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating command", description: err.message, variant: "destructive" });
     },
   });
 
@@ -937,6 +1165,22 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
       toast({ title: "Command deleted" });
     },
   });
+
+  const startEditing = (cmd: Command) => {
+    setEditingCommandId(cmd.id);
+    setEditForm({
+      name: cmd.name,
+      description: cmd.description,
+      promptTemplate: cmd.promptTemplate,
+      argumentHint: cmd.argumentHint,
+      context: cmd.context,
+      agentType: cmd.agentType,
+      allowedTools: [...cmd.allowedTools],
+      model: cmd.model,
+      disableModelInvocation: cmd.disableModelInvocation,
+      userInvocable: cmd.userInvocable,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -956,41 +1200,16 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
       {showNew && (
         <Card>
           <CardContent className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Command Name</Label>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm text-muted-foreground">/</span>
-                  <Input
-                    value={newCmd.name}
-                    onChange={(e) => setNewCmd((c) => ({ ...c, name: e.target.value.replace(/\s/g, "-").toLowerCase() }))}
-                    placeholder="review-code"
-                    data-testid="input-command-name"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  value={newCmd.description}
-                  onChange={(e) => setNewCmd((c) => ({ ...c, description: e.target.value }))}
-                  placeholder="What this command does"
-                  data-testid="input-command-description"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Prompt Template</Label>
-              <Textarea
-                value={newCmd.promptTemplate}
-                onChange={(e) => setNewCmd((c) => ({ ...c, promptTemplate: e.target.value }))}
-                placeholder="Review the following code for security vulnerabilities and best practices..."
-                className="min-h-[120px] font-mono text-sm"
-                data-testid="textarea-command-template"
-              />
-            </div>
+            <CommandFormFields form={newCmd} setForm={setNewCmd} />
             <div className="flex items-center gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowNew(false)} data-testid="button-cancel-command">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowNew(false);
+                  setNewCmd({ ...emptyCommandForm, allowedTools: [] });
+                }}
+                data-testid="button-cancel-command"
+              >
                 Cancel
               </Button>
               <Button
@@ -1017,33 +1236,78 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
           {commands.map((cmd) => (
             <Card key={cmd.id} data-testid={`card-command-${cmd.id}`}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
-                      <TerminalIcon className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <code className="text-sm font-mono font-medium">/{cmd.name}</code>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{cmd.description}</p>
-                      {cmd.promptTemplate && (
-                        <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-20 font-mono">
-                          {cmd.promptTemplate.slice(0, 150)}
-                          {cmd.promptTemplate.length > 150 ? "..." : ""}
-                        </pre>
-                      )}
+                {editingCommandId === cmd.id ? (
+                  <div className="space-y-4">
+                    <CommandFormFields form={editForm} setForm={setEditForm} />
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setEditingCommandId(null)}
+                        data-testid="button-cancel-edit-command"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => updateMutation.mutate({ ...editForm, id: cmd.id })}
+                        disabled={!editForm.name.trim() || updateMutation.isPending}
+                        data-testid="button-save-edit-command"
+                      >
+                        {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteMutation.mutate(cmd.id)}
-                    data-testid={`button-delete-command-${cmd.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                      onClick={() => startEditing(cmd)}
+                    >
+                      <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
+                        <TerminalIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <code className="text-sm font-mono font-medium">/{cmd.name}</code>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{cmd.description}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {cmd.context && (
+                            <Badge variant="secondary" className="text-[10px]">{cmd.context}</Badge>
+                          )}
+                          {cmd.model && (
+                            <Badge variant="secondary" className="text-[10px]">model: {cmd.model}</Badge>
+                          )}
+                          {cmd.context === "fork" && cmd.agentType && (
+                            <Badge variant="secondary" className="text-[10px]">{cmd.agentType}</Badge>
+                          )}
+                          {cmd.disableModelInvocation === "true" && (
+                            <Badge variant="outline" className="text-[10px]">Auto-invoke: off</Badge>
+                          )}
+                          {cmd.userInvocable === "false" && (
+                            <Badge variant="outline" className="text-[10px]">Hidden from menu</Badge>
+                          )}
+                        </div>
+                        {cmd.promptTemplate && (
+                          <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-20 font-mono">
+                            {cmd.promptTemplate.slice(0, 150)}
+                            {cmd.promptTemplate.length > 150 ? "..." : ""}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMutation.mutate(cmd.id);
+                      }}
+                      data-testid={`button-delete-command-${cmd.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
