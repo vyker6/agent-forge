@@ -3,12 +3,16 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import {
   agents, skills, commands, fileMapEntries, projects, projectAgents,
+  rules, projectSettings, hooks,
   type Agent, type InsertAgent,
   type Skill, type InsertSkill,
   type Command, type InsertCommand,
   type FileMapEntry, type InsertFileMapEntry,
   type Project, type InsertProject,
   type ProjectAgent, type InsertProjectAgent,
+  type Rule, type InsertRule,
+  type ProjectSettings, type InsertProjectSettings,
+  type Hook, type InsertHook,
 } from "@shared/schema";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -41,9 +45,24 @@ export interface IStorage {
   createProject(data: InsertProject): Promise<Project>;
   deleteProject(id: string): Promise<void>;
 
+  updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
+
   getProjectAgents(projectId: string): Promise<ProjectAgent[]>;
   addProjectAgent(data: InsertProjectAgent): Promise<ProjectAgent>;
   removeProjectAgent(projectId: string, agentId: string): Promise<void>;
+
+  getRules(projectId: string): Promise<Rule[]>;
+  createRule(data: InsertRule): Promise<Rule>;
+  updateRule(id: string, data: Partial<InsertRule>): Promise<Rule | undefined>;
+  deleteRule(id: string): Promise<void>;
+
+  getProjectSettings(projectId: string): Promise<ProjectSettings | undefined>;
+  upsertProjectSettings(projectId: string, data: Partial<InsertProjectSettings>): Promise<ProjectSettings>;
+
+  getHooks(projectId: string): Promise<Hook[]>;
+  createHook(data: InsertHook): Promise<Hook>;
+  updateHook(id: string, data: Partial<InsertHook>): Promise<Hook | undefined>;
+  deleteHook(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -144,6 +163,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(projects).where(eq(projects.id, id));
   }
 
+  async updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined> {
+    const [project] = await db.update(projects).set(data).where(eq(projects.id, id)).returning();
+    return project;
+  }
+
   async getProjectAgents(projectId: string): Promise<ProjectAgent[]> {
     return db.select().from(projectAgents).where(eq(projectAgents.projectId, projectId));
   }
@@ -160,6 +184,57 @@ export class DatabaseStorage implements IStorage {
     if (match) {
       await db.delete(projectAgents).where(eq(projectAgents.id, match.id));
     }
+  }
+
+  async getRules(projectId: string): Promise<Rule[]> {
+    return db.select().from(rules).where(eq(rules.projectId, projectId)).orderBy(rules.sortOrder);
+  }
+
+  async createRule(data: InsertRule): Promise<Rule> {
+    const [rule] = await db.insert(rules).values(data).returning();
+    return rule;
+  }
+
+  async updateRule(id: string, data: Partial<InsertRule>): Promise<Rule | undefined> {
+    const [rule] = await db.update(rules).set(data).where(eq(rules.id, id)).returning();
+    return rule;
+  }
+
+  async deleteRule(id: string): Promise<void> {
+    await db.delete(rules).where(eq(rules.id, id));
+  }
+
+  async getProjectSettings(projectId: string): Promise<ProjectSettings | undefined> {
+    const [settings] = await db.select().from(projectSettings).where(eq(projectSettings.projectId, projectId));
+    return settings;
+  }
+
+  async upsertProjectSettings(projectId: string, data: Partial<InsertProjectSettings>): Promise<ProjectSettings> {
+    const existing = await this.getProjectSettings(projectId);
+    if (existing) {
+      const [updated] = await db.update(projectSettings).set(data).where(eq(projectSettings.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(projectSettings).values({ ...data, projectId }).returning();
+    return created;
+  }
+
+  async getHooks(projectId: string): Promise<Hook[]> {
+    return db.select().from(hooks).where(eq(hooks.projectId, projectId)).orderBy(hooks.sortOrder);
+  }
+
+  async createHook(data: InsertHook): Promise<Hook> {
+    const [hook] = await db.insert(hooks).values(data).returning();
+    return hook;
+  }
+
+  async updateHook(id: string, data: Partial<InsertHook>): Promise<Hook | undefined> {
+    const [hook] = await db.update(hooks).set(data).where(eq(hooks.id, id)).returning();
+    return hook;
+  }
+
+  async deleteHook(id: string): Promise<void> {
+    await db.delete(hooks).where(eq(hooks.id, id));
   }
 }
 
