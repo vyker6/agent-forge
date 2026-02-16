@@ -136,6 +136,35 @@ export async function registerRoutes(
     res.status(201).json(project);
   });
 
+  // Import ZIP — must be before /:id routes
+  app.post("/api/projects/import", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const projectName = (req.body.projectName as string) || "Imported Project";
+      const files = await parseZipBuffer(req.file.buffer);
+      const result = await importFiles(files, projectName);
+      res.status(201).json(result);
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Import markdown paste
+  app.post("/api/projects/import/markdown", async (req, res) => {
+    try {
+      const { content, fileType, projectId, agentId } = req.body;
+      if (!content || !fileType || !projectId) {
+        return res.status(400).json({ error: "content, fileType, and projectId are required" });
+      }
+      const result = await parseMarkdownContent(content, fileType, projectId, agentId);
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   app.delete("/api/projects/:id", async (req, res) => {
     await storage.deleteProject(req.params.id);
     res.status(204).end();
@@ -232,35 +261,6 @@ export async function registerRoutes(
   app.delete("/api/hooks/:id", async (req, res) => {
     await storage.deleteHook(req.params.id);
     res.status(204).end();
-  });
-
-  // Import ZIP
-  app.post("/api/projects/import", upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-      const projectName = (req.body.projectName as string) || "Imported Project";
-      const files = await parseZipBuffer(req.file.buffer);
-      const result = await importFiles(files, projectName);
-      res.status(201).json(result);
-    } catch (e) {
-      res.status(500).json({ error: (e as Error).message });
-    }
-  });
-
-  // Import markdown paste
-  app.post("/api/projects/import/markdown", async (req, res) => {
-    try {
-      const { content, fileType, projectId, agentId } = req.body;
-      if (!content || !fileType || !projectId) {
-        return res.status(400).json({ error: "content, fileType, and projectId are required" });
-      }
-      const result = await parseMarkdownContent(content, fileType, projectId, agentId);
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: (e as Error).message });
-    }
   });
 
   app.get("/api/projects/:id/export", async (req, res) => {
