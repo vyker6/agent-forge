@@ -143,11 +143,9 @@ export default function AgentBuilderPage() {
     }
   };
 
-  const handleCreate = async () => {
-    if (!config) return;
-    setIsCreating(true);
+  const saveAgent = async (): Promise<{ id: string } | null> => {
+    if (!config) return null;
     try {
-      // Create the agent
       const agentRes = await apiRequest("POST", "/api/agents", {
         ...config.agent,
         preloadedSkills: [],
@@ -179,15 +177,39 @@ export default function AgentBuilderPage() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
-
-      const slug = config.agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-      setCreatedAgent({ id: agent.id, name: config.agent.name, slug });
+      return agent;
     } catch (err) {
       toast({
         title: "Creation failed",
         description: err instanceof Error ? err.message : "Could not create agent",
         variant: "destructive",
       });
+      return null;
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!config) return;
+    setIsCreating(true);
+    try {
+      const agent = await saveAgent();
+      if (agent) {
+        const slug = config.agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+        setCreatedAgent({ id: agent.id, name: config.agent.name, slug });
+      }
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCustomize = async () => {
+    if (!config) return;
+    setIsCreating(true);
+    try {
+      const agent = await saveAgent();
+      if (agent) {
+        navigate(`/agents/${agent.id}`);
+      }
     } finally {
       setIsCreating(false);
     }
@@ -382,9 +404,8 @@ export default function AgentBuilderPage() {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => {
-                    navigate("/agents/new");
-                  }}
+                  onClick={handleCustomize}
+                  disabled={isCreating}
                 >
                   Customize in Editor
                 </Button>
