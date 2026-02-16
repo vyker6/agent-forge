@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { Bot, FolderOpen, Rocket, Plus, Upload } from "lucide-react";
+import { Bot, FolderOpen, Rocket, Plus, Upload, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Agent } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
@@ -108,6 +108,18 @@ export function AppSidebar() {
                   <Link href="/import" data-testid="link-import">
                     <Upload className="h-4 w-4" />
                     <span>Import</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location === "/templates"}
+                  tooltip="Templates"
+                >
+                  <Link href="/templates" data-testid="link-templates">
+                    <Sparkles className="h-4 w-4" />
+                    <span>Templates</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

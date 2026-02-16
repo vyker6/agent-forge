@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import {
   ArrowLeft, Save, FileText, Puzzle, Terminal as TerminalIcon,
-  FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File
+  FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File, Eye
 } from "lucide-react";
 import type { Agent, Skill, Command, FileMapEntry, InsertAgent, McpServer, ProjectAgent } from "@shared/schema";
 import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES, PERMISSION_MODES } from "@shared/schema";
@@ -36,6 +36,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { MarkdownPreview } from "@/components/markdown-preview";
+import { generateAgentMarkdown } from "@/lib/generate-markdown";
+import { FieldTooltip } from "@/components/field-tooltip";
 
 export default function AgentEditorPage() {
   const [, params] = useRoute("/agents/:id");
@@ -251,6 +254,14 @@ export default function AgentEditorPage() {
                       <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">{fileMap.length}</Badge>
                     )}
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="preview"
+                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-3 py-2"
+                    data-testid="tab-preview"
+                  >
+                    <Eye className="h-4 w-4 mr-1.5" />
+                    Preview
+                  </TabsTrigger>
                 </>
               )}
             </TabsList>
@@ -278,6 +289,9 @@ export default function AgentEditorPage() {
                 </TabsContent>
                 <TabsContent value="filemap" className="p-6 mt-0 max-w-3xl">
                   <FileMapTab agentId={agentId} entries={fileMap} />
+                </TabsContent>
+                <TabsContent value="preview" className="p-6 mt-0 max-w-3xl">
+                  <PreviewTab form={form} skills={skills} commands={commands} />
                 </TabsContent>
               </>
             )}
@@ -308,7 +322,10 @@ function AgentConfigForm({
       <div className="grid grid-cols-1 md:grid-cols-[1fr,auto] gap-6">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <div className="flex items-center gap-1">
+              <Label htmlFor="name">Name</Label>
+              <FieldTooltip field="agentName" />
+            </div>
             <Input
               id="name"
               value={form.name}
@@ -318,7 +335,10 @@ function AgentConfigForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <div className="flex items-center gap-1">
+              <Label htmlFor="description">Description</Label>
+              <FieldTooltip field="agentDescription" />
+            </div>
             <Input
               id="description"
               value={form.description}
@@ -343,7 +363,10 @@ function AgentConfigForm({
       <Separator />
 
       <div className="space-y-2">
-        <Label htmlFor="systemPrompt">System Prompt / Instructions</Label>
+        <div className="flex items-center gap-1">
+          <Label htmlFor="systemPrompt">System Prompt / Instructions</Label>
+          <FieldTooltip field="systemPrompt" />
+        </div>
         <p className="text-xs text-muted-foreground">
           The core instructions that define this agent's behavior and expertise
         </p>
@@ -355,13 +378,31 @@ function AgentConfigForm({
           className="min-h-[200px] font-mono text-sm"
           data-testid="textarea-system-prompt"
         />
+        {!form.systemPrompt && (
+          <button
+            type="button"
+            className="text-xs text-primary hover:underline"
+            onClick={() =>
+              setForm((f) => ({
+                ...f,
+                systemPrompt:
+                  "You are a specialized code reviewer. When asked to review code:\n\n1. Analyze the code for bugs, security issues, and performance problems\n2. Check for adherence to best practices and coding standards\n3. Suggest specific improvements with code examples\n4. Be constructive and explain the reasoning behind each suggestion",
+              }))
+            }
+          >
+            Try an example prompt
+          </button>
+        )}
       </div>
 
       <Separator />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label>Model</Label>
+          <div className="flex items-center gap-1">
+            <Label>Model</Label>
+            <FieldTooltip field="model" />
+          </div>
           <Select
             value={form.model}
             onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
@@ -379,7 +420,10 @@ function AgentConfigForm({
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Memory Scope</Label>
+          <div className="flex items-center gap-1">
+            <Label>Memory Scope</Label>
+            <FieldTooltip field="memoryScope" />
+          </div>
           <Select
             value={form.memoryScope}
             onValueChange={(v) => setForm((f) => ({ ...f, memoryScope: v }))}
@@ -402,7 +446,10 @@ function AgentConfigForm({
 
       <div className="space-y-3">
         <div>
-          <Label>Allowed Tools</Label>
+          <div className="flex items-center gap-1">
+            <Label>Allowed Tools</Label>
+            <FieldTooltip field="tools" />
+          </div>
           <p className="text-xs text-muted-foreground mt-1">
             Select which tools this agent can use
           </p>
@@ -467,7 +514,10 @@ function AgentConfigForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label>Permission Mode</Label>
+          <div className="flex items-center gap-1">
+            <Label>Permission Mode</Label>
+            <FieldTooltip field="permissionMode" />
+          </div>
           <p className="text-xs text-muted-foreground">
             How the agent handles permission requests
           </p>
@@ -488,7 +538,10 @@ function AgentConfigForm({
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Max Turns</Label>
+          <div className="flex items-center gap-1">
+            <Label>Max Turns</Label>
+            <FieldTooltip field="maxTurns" />
+          </div>
           <p className="text-xs text-muted-foreground">
             Limit agentic turns (blank = unlimited)
           </p>
@@ -1377,6 +1430,51 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
             </Card>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function PreviewTab({ form, skills, commands }: { form: InsertAgent; skills: Skill[]; commands: Command[] }) {
+  const allFiles = generateAgentMarkdown(
+    {
+      name: form.name || "untitled",
+      description: form.description ?? "",
+      tools: form.tools ?? [],
+      disallowedTools: form.disallowedTools ?? [],
+      model: form.model ?? "sonnet",
+      memoryScope: form.memoryScope ?? "project",
+      permissionMode: form.permissionMode ?? "default",
+      maxTurns: form.maxTurns ?? null,
+      preloadedSkills: form.preloadedSkills ?? [],
+      mcpServers: form.mcpServers ?? [],
+      systemPrompt: form.systemPrompt ?? "",
+    },
+    skills,
+    commands
+  );
+
+  const filePaths = Object.keys(allFiles);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Preview</h2>
+        <p className="text-sm text-muted-foreground">
+          Live preview of the generated markdown files
+        </p>
+      </div>
+      {filePaths.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
+            <Eye className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Add a name to see preview</p>
+          </CardContent>
+        </Card>
+      ) : (
+        filePaths.map((path) => (
+          <MarkdownPreview key={path} filename={path} content={allFiles[path]} />
+        ))
       )}
     </div>
   );

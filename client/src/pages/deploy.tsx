@@ -1,17 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Rocket, Download, FolderOpen, Bot, CheckCircle2,
-  FileText, Puzzle, Terminal as TerminalIcon, FolderTree,
-  ChevronDown, ChevronRight, AlertCircle, Package, Copy, Server
+  Rocket, Download, Bot, CheckCircle2,
+  Terminal as TerminalIcon,
+  AlertCircle, Package, Copy, Server
 } from "lucide-react";
-import type { Agent, Project, ProjectAgent, McpServer } from "@shared/schema";
+import type { Agent, Skill, Command, FileMapEntry, Project, ProjectAgent, McpServer, Rule, ProjectSettings, Hook } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -19,18 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { InteractiveFileTree } from "@/components/interactive-file-tree";
+import { MarkdownPreview } from "@/components/markdown-preview";
+import { buildExportFiles } from "@/lib/generate-markdown";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 
 export default function DeployPage() {
   const { toast } = useToast();
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [isDeploying, setIsDeploying] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(true);
+  const [selectedFilePath, setSelectedFilePath] = useState<string>("");
+  const [selectedFileContent, setSelectedFileContent] = useState<string>("");
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -50,9 +53,63 @@ export default function DeployPage() {
     enabled: !!selectedProjectId,
   });
 
+  const { data: rules = [] } = useQuery<Rule[]>({
+    queryKey: ["/api/projects", selectedProjectId, "rules"],
+    enabled: !!selectedProjectId,
+  });
+
+  const { data: projectSettings } = useQuery<ProjectSettings | null>({
+    queryKey: ["/api/projects", selectedProjectId, "settings"],
+    enabled: !!selectedProjectId,
+  });
+
+  const { data: projectHooks = [] } = useQuery<Hook[]>({
+    queryKey: ["/api/projects", selectedProjectId, "hooks"],
+    enabled: !!selectedProjectId,
+  });
+
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const assignedAgentIds = projectAgents.map((pa) => pa.agentId);
   const assignedAgents = agents.filter((a) => assignedAgentIds.includes(a.id));
+
+  // Fetch all agent details (skills, commands, file maps) in one query
+  const agentIdsKey = assignedAgentIds.sort().join(",");
+  const { data: agentDetails = [] } = useQuery<
+    Array<{ agent: Agent; skills: Skill[]; commands: Command[]; fileMap: FileMapEntry[] }>
+  >({
+    queryKey: ["/api/agent-details-batch", agentIdsKey],
+    queryFn: async () => {
+      const results = [];
+      for (const agent of assignedAgents) {
+        const [skillsRes, commandsRes, fileMapRes] = await Promise.all([
+          fetch(`/api/agents/${agent.id}/skills`, { credentials: "include" }),
+          fetch(`/api/agents/${agent.id}/commands`, { credentials: "include" }),
+          fetch(`/api/agents/${agent.id}/file-map`, { credentials: "include" }),
+        ]);
+        results.push({
+          agent,
+          skills: await skillsRes.json() as Skill[],
+          commands: await commandsRes.json() as Command[],
+          fileMap: await fileMapRes.json() as FileMapEntry[],
+        });
+      }
+      return results;
+    },
+    enabled: assignedAgents.length > 0,
+  });
+
+  const exportFiles = useMemo(() => {
+    if (!selectedProject || agentDetails.length === 0) return {};
+
+    return buildExportFiles(
+      selectedProject,
+      agentDetails,
+      rules,
+      projectSettings ?? null,
+      projectHooks,
+      mcpServers
+    );
+  }, [selectedProject, agentDetails, rules, projectSettings, projectHooks, mcpServers]);
 
   const [isExportingPlugin, setIsExportingPlugin] = useState(false);
 
@@ -121,6 +178,11 @@ export default function DeployPage() {
     }
   };
 
+  const handleFileSelect = (path: string, content: string) => {
+    setSelectedFilePath(path);
+    setSelectedFileContent(content);
+  };
+
   if (projectsLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -130,8 +192,10 @@ export default function DeployPage() {
     );
   }
 
+  const fileCount = Object.keys(exportFiles).length;
+
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-deploy-title">
           Deploy Agents
@@ -163,7 +227,7 @@ export default function DeployPage() {
               </p>
             </div>
           ) : (
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+            <Select value={selectedProjectId} onValueChange={(v) => { setSelectedProjectId(v); setSelectedFilePath(""); setSelectedFileContent(""); }}>
               <SelectTrigger data-testid="select-deploy-project">
                 <SelectValue placeholder="Choose a project..." />
               </SelectTrigger>
@@ -201,24 +265,47 @@ export default function DeployPage() {
                 </div>
               </div>
 
-              {assignedAgents.length > 0 && (
-                <Collapsible open={previewOpen} onOpenChange={setPreviewOpen}>
-                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium w-full hover-elevate p-2 rounded-md" data-testid="button-toggle-preview">
-                    {previewOpen ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    Generated File Preview
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <FilePreview
-                      project={selectedProject}
-                      agents={assignedAgents}
-                      mcpServerCount={mcpServers.length}
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
+              {fileCount > 0 && (
+                <div className="border rounded-lg overflow-hidden" style={{ height: "420px" }}>
+                  <ResizablePanelGroup direction="horizontal">
+                    <ResizablePanel defaultSize={35} minSize={20}>
+                      <InteractiveFileTree
+                        files={exportFiles}
+                        selectedPath={selectedFilePath}
+                        onSelect={handleFileSelect}
+                        className="h-full"
+                      />
+                    </ResizablePanel>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel defaultSize={65} minSize={30}>
+                      <div className="h-full overflow-auto">
+                        {selectedFilePath ? (
+                          selectedFilePath.endsWith(".json") ? (
+                            <div className="p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-xs font-mono text-muted-foreground">{selectedFilePath}</span>
+                              </div>
+                              <pre className="text-xs font-mono whitespace-pre-wrap break-words bg-muted p-3 rounded-md">
+                                {selectedFileContent}
+                              </pre>
+                            </div>
+                          ) : (
+                            <div className="p-4">
+                              <MarkdownPreview
+                                content={selectedFileContent}
+                                filename={selectedFilePath}
+                              />
+                            </div>
+                          )
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                            Select a file to preview its contents
+                          </div>
+                        )}
+                      </div>
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
+                </div>
               )}
 
               <div className="flex gap-3">
@@ -303,37 +390,6 @@ function Step({ number, title, children }: { number: number; title: string; chil
   );
 }
 
-function FilePreview({ project, agents, mcpServerCount = 0 }: { project: Project; agents: Agent[]; mcpServerCount?: number }) {
-  return (
-    <Card className="mt-2">
-      <CardContent className="p-0">
-        <ScrollArea className="max-h-64">
-          <div className="p-3 space-y-1 font-mono text-xs">
-            {mcpServerCount > 0 && (
-              <TreeLine depth={0} icon={<Server className="h-3 w-3" />} label=".mcp.json" />
-            )}
-            <TreeLine depth={0} icon={<FolderOpen className="h-3 w-3" />} label=".claude/" />
-            {project.claudeMdContent && (
-              <TreeLine depth={1} icon={<FileText className="h-3 w-3" />} label="CLAUDE.md" />
-            )}
-            <TreeLine depth={1} icon={<FolderOpen className="h-3 w-3" />} label="agents/" />
-            {agents.map((agent) => (
-              <TreeLine
-                key={agent.id}
-                depth={2}
-                icon={<FileText className="h-3 w-3" />}
-                label={`${agent.name.toLowerCase().replace(/\s+/g, "-")}.md`}
-              />
-            ))}
-            <TreeLine depth={1} icon={<FolderOpen className="h-3 w-3" />} label="commands/" />
-            <TreeLine depth={1} icon={<FolderOpen className="h-3 w-3" />} label="skills/" />
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
-  );
-}
-
 function CliCommand({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const command = `npx agent-maker install ${window.location.origin}/api/projects/${projectId}/export?format=json`;
@@ -351,26 +407,6 @@ function CliCommand({ projectId }: { projectId: string }) {
       <Button variant="outline" size="icon" onClick={handleCopy} data-testid="button-copy-cli">
         <Copy className="h-4 w-4" />
       </Button>
-    </div>
-  );
-}
-
-function TreeLine({
-  depth,
-  icon,
-  label,
-}: {
-  depth: number;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <div
-      className="flex items-center gap-1.5 text-muted-foreground py-0.5"
-      style={{ paddingLeft: `${depth * 16}px` }}
-    >
-      {icon}
-      <span>{label}</span>
     </div>
   );
 }

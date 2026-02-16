@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { OnboardingDialog } from "@/components/onboarding-dialog";
 import NotFound from "@/pages/not-found";
 import AgentsPage from "@/pages/agents";
 import AgentEditorPage from "@/pages/agent-editor";
@@ -14,6 +15,7 @@ import ProjectsPage from "@/pages/projects";
 import ProjectEditorPage from "@/pages/project-editor";
 import DeployPage from "@/pages/deploy";
 import ImportPage from "@/pages/import";
+import TemplatesPage from "@/pages/templates";
 
 function Router() {
   return (
@@ -24,6 +26,7 @@ function Router() {
       <Route path="/projects" component={ProjectsPage} />
       <Route path="/projects/:id" component={ProjectEditorPage} />
       <Route path="/import" component={ImportPage} />
+      <Route path="/templates" component={TemplatesPage} />
       <Route path="/deploy" component={DeployPage} />
       <Route component={NotFound} />
     </Switch>
@@ -54,6 +57,7 @@ function App() {
               </div>
             </div>
           </SidebarProvider>
+          <OnboardingDialog />
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>
