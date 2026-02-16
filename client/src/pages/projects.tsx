@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Plus, FolderOpen, Trash2, MoreVertical, Bot, ChevronRight } from "lucide-react";
+import { Plus, FolderOpen, Trash2, MoreVertical, Bot, ChevronRight, Upload } from "lucide-react";
 import type { Agent, Project, ProjectAgent } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function ProjectsPage() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [showNew, setShowNew] = useState(false);
   const [newProject, setNewProject] = useState({ name: "", description: "", claudeMdContent: "" });
 
@@ -88,10 +89,16 @@ export default function ProjectsPage() {
             Bundle agents into deployable project configurations
           </p>
         </div>
-        <Button onClick={() => setShowNew(true)} data-testid="button-create-project">
-          <Plus className="h-4 w-4 mr-2" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate("/import")} data-testid="button-import-project">
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button onClick={() => setShowNew(true)} data-testid="button-create-project">
+            <Plus className="h-4 w-4 mr-2" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       {showNew && (
