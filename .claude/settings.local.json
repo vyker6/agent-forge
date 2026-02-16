@@ -43,7 +43,8 @@
       "Bash(bun run test:*)",
       "Bash(pkill:*)",
       "Bash(echo:*)",
-      "Bash(jobs:*)"
+      "Bash(jobs:*)",
+      "Bash(grep:*)"
     ]
   }
 }

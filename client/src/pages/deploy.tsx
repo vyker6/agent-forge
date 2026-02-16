@@ -88,9 +88,9 @@ export default function DeployPage() {
         ]);
         results.push({
           agent,
-          skills: await skillsRes.json() as Skill[],
-          commands: await commandsRes.json() as Command[],
-          fileMap: await fileMapRes.json() as FileMapEntry[],
+          skills: skillsRes.ok ? await skillsRes.json() as Skill[] : [],
+          commands: commandsRes.ok ? await commandsRes.json() as Command[] : [],
+          fileMap: fileMapRes.ok ? await fileMapRes.json() as FileMapEntry[] : [],
         });
       }
       return results;

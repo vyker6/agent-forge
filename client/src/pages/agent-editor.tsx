@@ -89,10 +89,12 @@ export default function AgentEditorPage() {
   const { data: allProjectAgents = [] } = useQuery<(ProjectAgent & { projectId: string })[]>({
     queryKey: ["/api/project-agents-for-agent", agentId],
     queryFn: async () => {
-      const projectsRes = await fetch("/api/projects");
+      const projectsRes = await fetch("/api/projects", { credentials: "include" });
+      if (!projectsRes.ok) return [];
       const projects = await projectsRes.json();
       for (const p of projects) {
-        const pasRes = await fetch(`/api/projects/${p.id}/agents`);
+        const pasRes = await fetch(`/api/projects/${p.id}/agents`, { credentials: "include" });
+        if (!pasRes.ok) continue;
         const pas = await pasRes.json();
         const match = pas.find((pa: ProjectAgent) => pa.agentId === agentId);
         if (match) return [match];
@@ -754,14 +756,14 @@ function SkillFormFields({
         <div className="space-y-2">
           <Label>Model</Label>
           <Select
-            value={form.model}
-            onValueChange={(v) => setForm((s) => ({ ...s, model: v }))}
+            value={form.model || "_none"}
+            onValueChange={(v) => setForm((s) => ({ ...s, model: v === "_none" ? "" : v }))}
           >
             <SelectTrigger data-testid="select-skill-model">
               <SelectValue placeholder="Inherit (Default)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Inherit (Default)</SelectItem>
+              <SelectItem value="_none">Inherit (Default)</SelectItem>
               <SelectItem value="sonnet">Claude Sonnet</SelectItem>
               <SelectItem value="opus">Claude Opus</SelectItem>
               <SelectItem value="haiku">Claude Haiku</SelectItem>
@@ -1115,14 +1117,14 @@ function CommandFormFields({
         <div className="space-y-2">
           <Label>Context</Label>
           <Select
-            value={form.context}
-            onValueChange={(v) => setForm((s) => ({ ...s, context: v }))}
+            value={form.context || "_none"}
+            onValueChange={(v) => setForm((s) => ({ ...s, context: v === "_none" ? "" : v }))}
           >
             <SelectTrigger data-testid="select-command-context">
               <SelectValue placeholder="None" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="_none">None</SelectItem>
               <SelectItem value="main">Main</SelectItem>
               <SelectItem value="fork">Fork (Separate Context)</SelectItem>
             </SelectContent>
@@ -1133,14 +1135,14 @@ function CommandFormFields({
           <div className="space-y-2">
             <Label>Agent Type</Label>
             <Select
-              value={form.agentType}
-              onValueChange={(v) => setForm((s) => ({ ...s, agentType: v }))}
+              value={form.agentType || "_none"}
+              onValueChange={(v) => setForm((s) => ({ ...s, agentType: v === "_none" ? "" : v }))}
             >
               <SelectTrigger data-testid="select-command-agent-type">
                 <SelectValue placeholder="Default" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Default</SelectItem>
+                <SelectItem value="_none">Default</SelectItem>
                 <SelectItem value="general-purpose">General Purpose</SelectItem>
                 <SelectItem value="Explore">Explore</SelectItem>
                 <SelectItem value="Plan">Plan</SelectItem>
@@ -1176,14 +1178,14 @@ function CommandFormFields({
         <div className="space-y-2">
           <Label>Model</Label>
           <Select
-            value={form.model}
-            onValueChange={(v) => setForm((s) => ({ ...s, model: v }))}
+            value={form.model || "_none"}
+            onValueChange={(v) => setForm((s) => ({ ...s, model: v === "_none" ? "" : v }))}
           >
             <SelectTrigger data-testid="select-command-model">
               <SelectValue placeholder="Inherit (Default)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Inherit (Default)</SelectItem>
+              <SelectItem value="_none">Inherit (Default)</SelectItem>
               <SelectItem value="sonnet">Claude Sonnet</SelectItem>
               <SelectItem value="opus">Claude Opus</SelectItem>
               <SelectItem value="haiku">Claude Haiku</SelectItem>
