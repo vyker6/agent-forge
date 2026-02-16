@@ -11,7 +11,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "code-review",
     description: "Reviews code for bugs, security issues, and best practices",
-    instructions: "Review the provided code thoroughly. Check for:\n- Bugs and logic errors\n- Security vulnerabilities\n- Performance issues\n- Code style and naming conventions\n- Missing error handling\n\nProvide specific, actionable feedback with line references.",
+    instructions: "# Code Review\n\nPerform a thorough code review of the provided files.\n\n## Process\n1. Read the target files and understand the overall structure and purpose\n2. Check for bugs, logic errors, and unhandled edge cases\n3. Review error handling — are errors caught, logged, and surfaced properly?\n4. Look for security vulnerabilities (injection, XSS, auth bypass, data exposure)\n5. Evaluate naming conventions, readability, and code organization\n6. Check for performance concerns (N+1 queries, memory leaks, unnecessary re-renders)\n7. Verify the code follows the project's existing patterns and conventions\n\n## Output Format\nFor each finding, provide:\n- **File and line**: Exact location (e.g., `src/auth.ts:42`)\n- **Severity**: Critical / Warning / Suggestion\n- **Issue**: Clear description of what's wrong\n- **Fix**: How to fix it, with a code example when helpful\n\n## Rules\n- Be constructive — explain the 'why' behind each suggestion\n- Prioritize findings by severity (critical issues first)\n- Don't nitpick formatting or style unless it hurts readability\n- If the code is well-written, say so — don't invent problems\n- Limit to the most impactful 5-10 findings per file\n- Consider the broader context before suggesting changes",
     context: "main",
     allowedTools: ["Read", "Glob", "Grep"],
     category: "Code Quality",
@@ -19,7 +19,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "test-writer",
     description: "Generates comprehensive unit and integration tests",
-    instructions: "Write thorough tests for the provided code. Include:\n- Unit tests for individual functions\n- Edge cases and error conditions\n- Integration tests where appropriate\n- Clear test descriptions\n\nUse the project's existing test framework and patterns.",
+    instructions: "# Test Writer\n\nGenerate thorough, well-structured tests for the provided code.\n\n## Process\n1. Read the target code and understand its inputs, outputs, and side effects\n2. Identify the project's existing test framework (Jest, Vitest, pytest, etc.)\n3. Follow the project's existing test patterns for file naming and structure\n4. Write tests covering the happy path, edge cases, and error conditions\n\n## What to Test\n- **Happy path**: Normal inputs produce expected outputs\n- **Edge cases**: Empty inputs, null/undefined, boundary values, large inputs\n- **Error cases**: Invalid inputs, network failures, missing data\n- **Integration**: Component interactions where relevant\n\n## Test Quality Rules\n- Each test should have a clear, descriptive name (e.g., \"returns empty array when no results match\")\n- One assertion per test when possible — test one behavior at a time\n- Use proper setup/teardown to avoid test interdependence\n- Mock external dependencies (APIs, databases) but not the code under test\n- Don't test implementation details — test behavior and outputs\n- Include both positive and negative test cases\n\n## Output\nWrite test files that are ready to run. Include any necessary imports and setup.",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
     category: "Testing",
@@ -27,7 +27,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "documentation",
     description: "Generates documentation, READMEs, and API docs",
-    instructions: "Generate clear, comprehensive documentation:\n- Use markdown formatting\n- Include code examples\n- Document parameters, return types, and exceptions\n- Add usage examples\n- Keep language concise and accessible",
+    instructions: "# Documentation Writer\n\nGenerate clear, well-organized documentation for the codebase.\n\n## Process\n1. Read the source code to understand what it does\n2. Identify the audience (developers, end users, or both)\n3. Generate documentation in the appropriate format\n\n## Documentation Types\n- **README**: Project overview, setup instructions, usage examples\n- **API docs**: Endpoint descriptions, request/response schemas, auth requirements\n- **Code docs**: Function signatures, parameter descriptions, return values\n- **Guides**: Step-by-step tutorials for common tasks\n\n## Writing Rules\n- Lead with what the reader needs to know first\n- Use code examples for anything non-obvious\n- Keep sentences short — one idea per sentence\n- Use headings and bullet points for scannability\n- Include copy-pasteable code snippets that actually work\n- Document error cases and edge cases, not just happy paths\n- Don't document the obvious (e.g., \"this function returns a string\" when the type already says so)\n\n## Format\nUse markdown with proper headings (##), code blocks with language tags, and tables for structured data.",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Documentation",
@@ -35,7 +35,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "refactor",
     description: "Suggests and applies code improvements",
-    instructions: "Analyze the code and suggest improvements:\n- Reduce complexity and duplication\n- Improve naming and readability\n- Extract functions/methods where appropriate\n- Apply SOLID principles\n- Preserve existing behavior\n\nExplain each change and why it improves the code.",
+    instructions: "# Refactoring Assistant\n\nAnalyze code and apply targeted improvements while preserving behavior.\n\n## Process\n1. Read the target code and understand what it does\n2. Identify specific improvement opportunities\n3. Apply changes one at a time, explaining each\n4. Verify the refactored code preserves the original behavior\n\n## What to Improve\n- **Duplication**: Extract shared logic into reusable functions\n- **Complexity**: Break large functions into smaller, focused ones\n- **Naming**: Rename unclear variables, functions, and parameters\n- **Structure**: Reorganize code for better readability and flow\n- **Patterns**: Apply appropriate design patterns where they simplify\n\n## Rules\n- Never change behavior — refactoring is about structure, not features\n- Make one type of change at a time so each step is reviewable\n- Explain WHY each change improves the code, not just what changed\n- Don't over-abstract — three similar lines is often better than a premature abstraction\n- Keep changes minimal and focused\n- If a refactoring would affect many files, describe the plan first before applying",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Code Quality",
@@ -43,7 +43,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "debug",
     description: "Systematically diagnoses and fixes bugs",
-    instructions: "Debug the reported issue:\n1. Reproduce the problem\n2. Identify the root cause (not just symptoms)\n3. Propose a fix\n4. Verify the fix doesn't introduce regressions\n\nExplain your reasoning at each step.",
+    instructions: "# Systematic Debugging\n\nDiagnose and fix the reported issue using a methodical approach.\n\n## Process\n1. **Understand the bug**: Read the error message, stack trace, or user report carefully\n2. **Reproduce**: Identify the exact steps or conditions that trigger the issue\n3. **Narrow down**: Use grep/read to find the relevant code path\n4. **Find root cause**: Trace the data flow to find WHERE and WHY the failure occurs\n5. **Fix**: Apply the minimal change that addresses the root cause\n6. **Verify**: Check that the fix works and doesn't break anything else\n\n## Debugging Techniques\n- Read error messages and stack traces carefully — they usually point to the exact location\n- Search for the error message string in the codebase to find where it's thrown\n- Check recent changes (git log) that might have introduced the bug\n- Look for common patterns: null/undefined access, off-by-one errors, race conditions, type mismatches\n- Check environment differences (dev vs prod, different configs)\n\n## Rules\n- Fix the root cause, not the symptom\n- Don't add try/catch to hide errors — find out why they happen\n- If a fix is complex, explain the tradeoffs\n- Consider edge cases the original code might have missed\n- Document what caused the bug so it can be prevented in the future",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
     category: "Debugging",
@@ -51,7 +51,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "security-audit",
     description: "Scans code for security vulnerabilities",
-    instructions: "Perform a security review:\n- Check for OWASP Top 10 vulnerabilities\n- Identify injection risks (SQL, XSS, command)\n- Review authentication and authorization\n- Check for sensitive data exposure\n- Verify input validation\n\nRate each finding by severity (Critical/High/Medium/Low).",
+    instructions: "# Security Audit\n\nPerform a comprehensive security review of the codebase.\n\n## Checklist\nCheck for these categories in order of severity:\n\n### Critical\n- **Injection**: SQL injection, command injection, XSS (cross-site scripting)\n- **Authentication bypass**: Missing auth checks, broken session management\n- **Sensitive data exposure**: API keys, passwords, tokens in code or logs\n\n### High\n- **Authorization flaws**: Users accessing other users' data, privilege escalation\n- **Insecure direct object references**: Predictable IDs without ownership checks\n- **CSRF**: Missing CSRF tokens on state-changing requests\n\n### Medium\n- **Input validation**: Missing or incomplete validation at system boundaries\n- **Error handling**: Stack traces or internal details exposed to users\n- **Dependencies**: Known vulnerabilities in packages\n\n### Low\n- **Headers**: Missing security headers (HSTS, CSP, X-Frame-Options)\n- **Logging**: Sensitive data in logs, insufficient audit trail\n- **Configuration**: Debug mode enabled, default credentials\n\n## Output Format\nFor each finding:\n- **Severity**: Critical / High / Medium / Low\n- **Location**: File and line number\n- **Vulnerability**: What the issue is\n- **Impact**: What an attacker could do\n- **Remediation**: Specific code changes to fix it",
     context: "fork",
     allowedTools: ["Read", "Glob", "Grep"],
     category: "Security",
@@ -59,7 +59,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "api-design",
     description: "Designs and documents REST API endpoints",
-    instructions: "Design API endpoints following REST best practices:\n- Use proper HTTP methods and status codes\n- Design consistent URL patterns\n- Define request/response schemas\n- Include error response formats\n- Add authentication requirements\n- Write OpenAPI/Swagger documentation",
+    instructions: "# API Design\n\nDesign REST API endpoints following industry best practices.\n\n## Process\n1. Understand the resource model — what entities exist and how they relate\n2. Define endpoints using proper REST conventions\n3. Specify request/response schemas with examples\n4. Document error responses and status codes\n\n## Conventions\n- **URLs**: Use plural nouns (`/users`, not `/user`), nest related resources (`/users/:id/posts`)\n- **Methods**: GET (read), POST (create), PUT/PATCH (update), DELETE (remove)\n- **Status codes**: 200 (success), 201 (created), 400 (bad input), 401 (unauthorized), 404 (not found), 422 (validation error), 500 (server error)\n- **Pagination**: Use `?page=1&limit=20` or cursor-based pagination for large datasets\n- **Filtering**: Use query params (`?status=active&sort=created_at`)\n\n## Output\nFor each endpoint, document:\n- Method and URL\n- Request body schema (with example)\n- Response schema (with example)\n- Possible error responses\n- Authentication requirements",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Architecture",
@@ -67,7 +67,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "performance",
     description: "Identifies and fixes performance bottlenecks",
-    instructions: "Analyze code for performance issues:\n- Identify N+1 queries and unnecessary DB calls\n- Find memory leaks and excessive allocations\n- Check for blocking operations\n- Suggest caching strategies\n- Recommend algorithmic improvements\n\nProvide benchmarks or estimates where possible.",
+    instructions: "# Performance Optimization\n\nAnalyze code for performance issues and apply targeted optimizations.\n\n## Process\n1. Identify the specific performance concern (slow page load, high memory, slow queries)\n2. Read the relevant code paths\n3. Look for common anti-patterns\n4. Suggest specific fixes with expected impact\n\n## Common Issues to Check\n- **Database**: N+1 queries, missing indexes, fetching unused columns, unoptimized joins\n- **Frontend**: Unnecessary re-renders, large bundle size, unoptimized images, missing lazy loading\n- **Backend**: Blocking I/O, missing caching, redundant computation, memory leaks\n- **Network**: Too many API calls, missing compression, no pagination\n\n## Rules\n- Measure before optimizing — identify the actual bottleneck first\n- Prefer simple solutions (add an index) over complex ones (rewrite the query engine)\n- Estimate the impact of each optimization (\"reduces queries from 50 to 1\")\n- Don't sacrifice readability for marginal performance gains\n- Consider caching only when the data access pattern justifies it",
     context: "fork",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     category: "Performance",
@@ -75,7 +75,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "typescript-helper",
     description: "Helps with TypeScript types, generics, and patterns",
-    instructions: "Help with TypeScript:\n- Fix type errors\n- Design proper type hierarchies\n- Write generic utility types\n- Use discriminated unions and template literals\n- Apply proper type narrowing\n\nExplain the type system concepts involved.",
+    instructions: "# TypeScript Helper\n\nHelp write correct, well-typed TypeScript code.\n\n## What I Can Help With\n- **Fix type errors**: Read the error message, understand the mismatch, and apply the right fix\n- **Design types**: Create interfaces, type aliases, and discriminated unions that model the domain\n- **Write generics**: Create reusable generic functions and types with proper constraints\n- **Type narrowing**: Use type guards, `in` operator, and discriminated unions to narrow types safely\n- **Utility types**: Apply built-in utilities (Partial, Required, Pick, Omit, Record, Extract, Exclude)\n\n## Rules\n- Prefer `interface` for objects that might be extended, `type` for unions and computed types\n- Avoid `any` — use `unknown` when the type is truly unknown, then narrow it\n- Don't over-type — if TypeScript can infer it, let it\n- Use `as const` for literal types instead of type assertions\n- Explain the type concepts involved so the user learns, not just gets a fix",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "TypeScript",
@@ -83,7 +83,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "git-helper",
     description: "Assists with git operations, commits, and PRs",
-    instructions: "Help with git workflows:\n- Write clear commit messages\n- Resolve merge conflicts\n- Create and manage branches\n- Review PR diffs\n- Suggest git best practices\n\nAlways explain what each git command does.",
+    instructions: "# Git Helper\n\nAssist with git workflows, from basic operations to complex scenarios.\n\n## Capabilities\n- **Commits**: Write clear, descriptive commit messages following conventional commits format\n- **Branches**: Create, merge, and manage feature branches\n- **Conflicts**: Walk through merge conflicts step by step, explaining each section\n- **History**: Navigate git log, find when changes were introduced, blame specific lines\n- **Recovery**: Recover lost commits, undo mistakes, clean up history\n\n## Commit Message Format\n```\ntype(scope): short description\n\nLonger explanation if needed.\n```\nTypes: feat, fix, refactor, docs, test, chore\n\n## Rules\n- Always explain what each git command does before running it\n- Warn about destructive operations (force push, reset --hard, rebase)\n- Prefer rebase for clean history on feature branches, merge for shared branches\n- Never force-push to main/master without explicit confirmation",
     context: "main",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     category: "DevOps",
@@ -91,7 +91,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "database-design",
     description: "Designs schemas, writes queries, and optimizes databases",
-    instructions: "Help with database design:\n- Design normalized schemas\n- Write efficient queries\n- Add proper indexes\n- Plan migrations\n- Optimize slow queries\n\nConsider scalability and data integrity.",
+    instructions: "# Database Design\n\nHelp design schemas, write queries, and optimize database operations.\n\n## Schema Design\n1. Identify entities and their relationships (1:1, 1:N, N:M)\n2. Normalize to 3NF by default — denormalize only for proven performance needs\n3. Choose appropriate column types (don't use TEXT for IDs, don't use INT for UUIDs)\n4. Add constraints: NOT NULL, UNIQUE, FOREIGN KEY with proper ON DELETE behavior\n5. Plan indexes for common query patterns\n\n## Query Optimization\n- Use EXPLAIN/ANALYZE to understand query plans\n- Add indexes for WHERE, JOIN, and ORDER BY columns\n- Avoid SELECT * — only fetch columns you need\n- Use JOINs instead of subqueries when possible\n- Paginate large result sets\n\n## Migration Planning\n- Write reversible migrations (both up and down)\n- Handle data transformations separately from schema changes\n- Test migrations against production-sized data\n- Never drop columns or tables without confirming the data is unused",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Architecture",
@@ -99,7 +99,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "accessibility",
     description: "Audits UI for WCAG compliance and accessibility",
-    instructions: "Audit components for accessibility:\n- Check ARIA attributes and roles\n- Verify keyboard navigation\n- Review color contrast ratios\n- Check screen reader compatibility\n- Ensure form labels and error states\n\nReference WCAG 2.1 guidelines.",
+    instructions: "# Accessibility Audit\n\nAudit UI components for WCAG 2.1 AA compliance.\n\n## Checklist\n\n### Keyboard Navigation\n- All interactive elements are reachable via Tab\n- Focus order follows visual reading order\n- Focus is visible (no `outline: none` without replacement)\n- Modal dialogs trap focus and return it on close\n- Custom widgets support expected keyboard shortcuts (Arrow keys, Enter, Escape)\n\n### Screen Readers\n- Images have descriptive `alt` text (or `alt=\"\"` if decorative)\n- Form inputs have associated `<label>` elements\n- ARIA roles and attributes are correct and necessary (don't add ARIA to native HTML elements)\n- Dynamic content updates use `aria-live` regions\n- Page has proper heading hierarchy (h1 → h2 → h3, no skipping levels)\n\n### Visual\n- Text has minimum 4.5:1 contrast ratio against background\n- Interactive elements have minimum 3:1 contrast\n- Information is not conveyed by color alone\n- Text can be resized to 200% without breaking layout\n\n## Output\nFor each issue: location, WCAG criterion violated, impact on users, and specific code fix.",
     context: "fork",
     allowedTools: ["Read", "Glob", "Grep"],
     category: "Design",
@@ -107,7 +107,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "migration",
     description: "Helps migrate between frameworks or versions",
-    instructions: "Guide the migration process:\n1. Analyze current dependencies and patterns\n2. Map old APIs to new equivalents\n3. Create a step-by-step migration plan\n4. Handle breaking changes\n5. Update tests and configuration\n\nPreserve functionality while modernizing.",
+    instructions: "# Migration Assistant\n\nGuide the migration of codebases between frameworks, libraries, or major versions.\n\n## Process\n1. **Assess**: Read package.json, scan imports, and understand current usage patterns\n2. **Map**: Create a mapping of old APIs → new equivalents\n3. **Plan**: Define the migration order (start with leaf dependencies, work inward)\n4. **Execute**: Apply changes file-by-file, running tests after each batch\n5. **Verify**: Run the full test suite and check for runtime errors\n\n## Rules\n- Never migrate everything at once — do it incrementally\n- Keep both old and new versions working during transition when possible\n- Update tests alongside code changes\n- Document breaking changes and new patterns for the team\n- Preserve existing functionality — migration should not change behavior\n- Handle deprecation warnings before they become errors",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
     category: "Migration",
@@ -115,7 +115,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "css-cleanup",
     description: "Cleans up and organizes CSS/styling code",
-    instructions: "Clean up styling code:\n- Remove unused CSS classes\n- Consolidate duplicate styles\n- Convert to design system tokens\n- Improve responsive design\n- Organize utility classes\n\nMaintain visual consistency.",
+    instructions: "# CSS Cleanup\n\nClean up and organize styling code for better maintainability.\n\n## Process\n1. Search for unused CSS classes across the codebase\n2. Identify duplicate or near-duplicate style rules\n3. Check for inconsistent spacing, colors, and font sizes\n4. Consolidate into reusable classes or design tokens\n\n## What to Fix\n- **Unused classes**: Search for class names that appear in CSS but not in any component\n- **Duplicates**: Multiple rules with the same properties — extract to a shared class\n- **Magic numbers**: Raw pixel/color values that should be design tokens or CSS variables\n- **Responsive issues**: Missing media queries, overflow on small screens\n- **Specificity problems**: Overly specific selectors, `!important` overuse\n\n## Rules\n- Test visual changes in the browser after each cleanup\n- Don't change visual appearance — only reorganize the code\n- Prefer utility classes (Tailwind) over custom CSS when the project uses Tailwind\n- Keep changes reviewable — one type of cleanup per commit",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Design",
@@ -123,7 +123,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "error-handling",
     description: "Adds robust error handling to code",
-    instructions: "Improve error handling:\n- Add try/catch blocks where needed\n- Create custom error classes\n- Add user-friendly error messages\n- Log errors for debugging\n- Handle edge cases gracefully\n\nDon't over-handle — only add error handling where it's needed.",
+    instructions: "# Error Handling\n\nAdd appropriate error handling to make the application resilient.\n\n## Where to Add Error Handling\n- **System boundaries**: API calls, file I/O, database queries, user input\n- **External dependencies**: Third-party services, environment variables\n- **Data parsing**: JSON.parse, type coercion, regex matching\n\n## Where NOT to Add Error Handling\n- Internal function calls with known, controlled inputs\n- Code that's already inside a try/catch higher in the call stack\n- Conditions that can't actually happen (don't defend against impossible states)\n\n## Pattern\n```\ntry {\n  // risky operation\n} catch (err) {\n  // 1. Log with context for debugging\n  // 2. Return a user-friendly error message\n  // 3. Don't swallow the error silently\n}\n```\n\n## Rules\n- Catch specific errors when possible, not generic `catch (err)`\n- Always include enough context in error messages to debug the issue\n- User-facing errors should be helpful: say what went wrong and what to do about it\n- Never expose internal stack traces or database errors to users\n- Don't use try/catch as flow control — handle expected cases with conditionals",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Code Quality",
@@ -131,7 +131,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "docker-setup",
     description: "Creates Docker configurations and compose files",
-    instructions: "Set up Docker:\n- Write optimized Dockerfiles\n- Create docker-compose.yml\n- Configure multi-stage builds\n- Set up health checks\n- Handle environment variables\n\nFollow Docker best practices for image size and security.",
+    instructions: "# Docker Setup\n\nCreate production-ready Docker configurations.\n\n## Dockerfile Best Practices\n1. Use multi-stage builds to keep images small\n2. Use specific base image tags (e.g., `node:20-slim`, not `node:latest`)\n3. Copy package.json first, install deps, then copy source (layer caching)\n4. Run as non-root user in production\n5. Use `.dockerignore` to exclude `node_modules`, `.git`, etc.\n\n## Docker Compose\n- Define all services (app, database, cache, etc.)\n- Use named volumes for persistent data\n- Set health checks for each service\n- Use environment variables for configuration\n- Define proper depends_on with health check conditions\n\n## Output\nGenerate:\n- `Dockerfile` with multi-stage build\n- `docker-compose.yml` for local development\n- `.dockerignore` file\n- Brief README section explaining how to use them",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "DevOps",
@@ -139,7 +139,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "ci-cd",
     description: "Sets up CI/CD pipelines for automated testing and deployment",
-    instructions: "Configure CI/CD:\n- Set up GitHub Actions / GitLab CI\n- Add build, test, and deploy stages\n- Configure caching for dependencies\n- Add environment-specific configs\n- Set up notifications\n\nKeep pipelines fast and reliable.",
+    instructions: "# CI/CD Setup\n\nConfigure automated build, test, and deployment pipelines.\n\n## Pipeline Stages\n1. **Install**: Install dependencies with caching\n2. **Lint**: Run ESLint/Prettier checks\n3. **Type Check**: Run TypeScript compiler (`tsc --noEmit`)\n4. **Test**: Run unit and integration tests\n5. **Build**: Create production build\n6. **Deploy**: Deploy to staging/production (if on main branch)\n\n## GitHub Actions Template\n- Trigger on push to main and pull requests\n- Cache `node_modules` with dependency hash\n- Run lint, type-check, and tests in parallel\n- Only deploy after all checks pass\n- Use environment secrets for API keys and credentials\n\n## Rules\n- Keep pipelines fast — cache dependencies, parallelize jobs\n- Fail fast — put the quickest checks first\n- Use matrix builds for multiple Node/OS versions only if needed\n- Never store secrets in the workflow file — use GitHub Secrets\n- Add status badges to the README",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "DevOps",
@@ -147,7 +147,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "code-explainer",
     description: "Explains complex code in beginner-friendly language",
-    instructions: "Explain the code clearly:\n- Break down complex logic step by step\n- Use analogies where helpful\n- Explain the \"why\" not just the \"what\"\n- Highlight important patterns\n- Suggest further reading\n\nAdjust complexity to the reader's level.",
+    instructions: "# Code Explainer\n\nExplain code in clear, beginner-friendly language.\n\n## Approach\n1. Start with a one-sentence summary of what the code does overall\n2. Break the code into logical sections\n3. Explain each section using plain language, avoiding jargon\n4. Use analogies to explain complex concepts (e.g., \"a Promise is like ordering food — you get a receipt now, food later\")\n5. Highlight the key patterns and why they're used\n\n## Rules\n- Explain the WHY, not just the WHAT (\"This checks if the user is logged in, because the next page requires authentication\")\n- Define technical terms when you first use them\n- Don't assume knowledge of frameworks or libraries — explain what they do\n- Use short sentences — one idea per sentence\n- Point out which parts are boilerplate (can be ignored) vs. the important logic\n- Ask if the reader wants more detail on any specific part\n\n## Output Format\nUse a step-by-step walkthrough with code snippets and explanations interleaved.",
     context: "fork",
     allowedTools: ["Read", "Glob", "Grep"],
     category: "Learning",
@@ -155,7 +155,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "regex-helper",
     description: "Writes, explains, and tests regular expressions",
-    instructions: "Help with regular expressions:\n- Write correct regex patterns\n- Explain each part of the pattern\n- Provide test cases\n- Suggest alternatives when regex is overkill\n- Handle edge cases\n\nAlways test with multiple inputs.",
+    instructions: "# Regex Helper\n\nWrite, explain, and test regular expressions.\n\n## When Asked to Write a Regex\n1. Clarify what should match and what shouldn't\n2. Write the pattern with named groups where helpful\n3. Explain each part of the pattern\n4. Provide test cases showing matches and non-matches\n\n## Explanation Format\nBreak down each regex into parts:\n```\n/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$/\n ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^\n  local part         domain name    TLD (2+ chars)\n```\n\n## Rules\n- Always provide at least 3 test strings (matching and non-matching)\n- Suggest simpler alternatives when regex is overkill (e.g., `string.includes()` or `string.startsWith()`)\n- Warn about common regex pitfalls: catastrophic backtracking, greedy vs lazy matching\n- Use non-capturing groups `(?:...)` unless captures are needed\n- Test edge cases: empty strings, very long inputs, special characters",
     context: "fork",
     allowedTools: ["Read", "Glob", "Grep"],
     category: "Utilities",
@@ -163,7 +163,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "dependency-audit",
     description: "Reviews and updates project dependencies",
-    instructions: "Audit project dependencies:\n- Check for outdated packages\n- Identify security vulnerabilities\n- Find unused dependencies\n- Suggest lighter alternatives\n- Plan safe upgrade paths\n\nConsider compatibility and breaking changes.",
+    instructions: "# Dependency Audit\n\nReview project dependencies for security, freshness, and necessity.\n\n## Process\n1. Run `npm audit` or equivalent to check for known vulnerabilities\n2. Check for outdated packages using `npm outdated`\n3. Identify unused dependencies by searching for imports\n4. Look for duplicate packages that serve the same purpose\n\n## What to Check\n- **Security**: Known CVEs in dependencies (especially critical/high severity)\n- **Outdated**: Major version behind, especially for security-critical packages\n- **Unused**: Packages in package.json that aren't imported anywhere\n- **Heavy**: Large packages that could be replaced with lighter alternatives\n- **Duplicates**: Multiple packages doing the same thing (e.g., moment + dayjs + date-fns)\n\n## Rules\n- Don't update major versions without checking the changelog for breaking changes\n- Test after each update — run the full test suite\n- Update one package at a time for easier debugging\n- Lock file changes should be in a separate commit from code changes\n- Flag packages with no recent activity or maintenance",
     context: "fork",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     category: "Maintenance",
@@ -171,7 +171,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "react-patterns",
     description: "Applies React best practices and modern patterns",
-    instructions: "Apply React best practices:\n- Use proper hooks patterns\n- Implement component composition\n- Optimize re-renders with memo/useMemo\n- Handle state management correctly\n- Write accessible components\n\nFollow the latest React conventions.",
+    instructions: "# React Patterns\n\nApply modern React best practices and fix common anti-patterns.\n\n## Common Issues to Fix\n- **Unnecessary state**: Derived values stored in state instead of computed during render\n- **Missing keys**: List items without stable, unique keys\n- **Effect misuse**: Side effects in event handlers that belong in useEffect, or vice versa\n- **Prop drilling**: Props passed through 3+ levels — consider context or composition\n- **Re-render waste**: Components re-rendering unnecessarily without memo/useMemo\n\n## Best Practices\n- Prefer composition over prop drilling (children, render props, context)\n- Colocate state with the component that uses it — lift only when shared\n- Use `useCallback` only when passing callbacks to memoized children\n- Use `useMemo` only when the computation is genuinely expensive\n- Keep effects minimal — one effect per concern, clean up subscriptions\n- Prefer controlled components for forms\n\n## Rules\n- Don't over-optimize — premature optimization hurts readability\n- Follow the project's existing patterns before introducing new ones\n- Explain the reasoning behind each suggestion",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Frontend",
@@ -179,7 +179,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "env-setup",
     description: "Helps set up development environment and tooling",
-    instructions: "Set up the development environment:\n- Configure ESLint and Prettier\n- Set up TypeScript config\n- Configure build tools\n- Add git hooks\n- Create .env templates\n\nDocument the setup process clearly.",
+    instructions: "# Environment Setup\n\nConfigure the development environment with proper tooling.\n\n## What to Set Up\n1. **TypeScript**: tsconfig.json with strict mode, proper paths, and module resolution\n2. **Linting**: ESLint with project-appropriate rules (React, Node, etc.)\n3. **Formatting**: Prettier config for consistent code style\n4. **Git Hooks**: Pre-commit hooks via husky + lint-staged\n5. **Environment Variables**: .env.example template with all required variables\n6. **Editor Config**: .editorconfig and VS Code settings for team consistency\n\n## Output\n- Generate configuration files that are ready to use\n- Add scripts to package.json (`lint`, `format`, `type-check`)\n- Create a brief setup guide in the README\n\n## Rules\n- Don't over-configure — start with sensible defaults\n- Make sure configs don't conflict (ESLint + Prettier compatibility)\n- Use the latest stable versions of all tools\n- Document any non-obvious configuration choices",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
     category: "DevOps",
@@ -187,7 +187,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "data-validation",
     description: "Adds input validation using Zod, Yup, or similar",
-    instructions: "Add data validation:\n- Define validation schemas\n- Add runtime type checking\n- Create reusable validators\n- Handle validation errors gracefully\n- Validate at system boundaries\n\nUse the project's preferred validation library.",
+    instructions: "# Data Validation\n\nAdd runtime data validation at system boundaries.\n\n## Where to Validate\n- **API endpoints**: Request body, query params, URL params\n- **Form inputs**: Client-side before submission\n- **External data**: API responses, file imports, environment variables\n- **Database inputs**: Before insert/update operations\n\n## Implementation\n1. Identify the project's validation library (Zod, Yup, Joi, or plain TypeScript)\n2. Define schemas that match the expected data shape\n3. Add validation at the system boundary (controller/route handler, not deep in business logic)\n4. Return clear, user-friendly error messages\n\n## Schema Design Rules\n- Be strict at boundaries, permissive internally\n- Use `.transform()` to normalize data (trim strings, lowercase emails)\n- Provide specific error messages for each field\n- Validate types, formats, ranges, and required fields\n- Share schemas between client and server when possible (e.g., Zod with tRPC)",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Code Quality",
@@ -195,7 +195,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "logging",
     description: "Sets up structured logging and monitoring",
-    instructions: "Implement logging:\n- Add structured log levels (debug, info, warn, error)\n- Include context in log messages\n- Set up log rotation\n- Add request/response logging\n- Configure monitoring alerts\n\nDon't log sensitive data.",
+    instructions: "# Logging Setup\n\nImplement structured, actionable logging.\n\n## Log Levels\n- **error**: Something broke and needs attention (failed requests, unhandled exceptions)\n- **warn**: Something unexpected but recoverable (deprecated API usage, retry attempts)\n- **info**: Important business events (user signup, payment processed, deploy completed)\n- **debug**: Detailed technical info for debugging (request/response bodies, SQL queries)\n\n## What to Log\n- All incoming HTTP requests (method, path, status, duration)\n- External API calls (endpoint, status, duration)\n- Authentication events (login, logout, failed attempts)\n- Business-critical operations (order placed, email sent)\n- Errors with full context (user ID, request ID, stack trace)\n\n## What NOT to Log\n- Passwords, tokens, API keys, or other secrets\n- Full credit card numbers or SSNs\n- Personal health information\n- Verbose data in production (use debug level for that)\n\n## Format\nUse structured JSON logging with consistent fields: `timestamp`, `level`, `message`, `requestId`, `userId`.",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Monitoring",
@@ -203,7 +203,7 @@ export const skillCatalog: CatalogSkill[] = [
   {
     name: "cleanup",
     description: "Removes dead code, unused imports, and TODOs",
-    instructions: "Clean up the codebase:\n- Remove unused imports and variables\n- Delete dead code and commented-out blocks\n- Resolve or document TODOs\n- Remove empty files\n- Clean up console.log statements\n\nBe careful not to remove code that's used dynamically.",
+    instructions: "# Codebase Cleanup\n\nRemove dead code and improve codebase hygiene.\n\n## Process\n1. Search for unused imports (TypeScript compiler warnings, ESLint no-unused-vars)\n2. Find dead code: functions/classes that are never called or imported\n3. Locate commented-out code blocks and evaluate if they should be deleted\n4. Find and resolve TODO/FIXME/HACK comments\n5. Remove console.log/console.debug statements from production code\n6. Delete empty files and unused test files\n\n## Safety Checks\nBefore deleting anything:\n- Search the entire codebase for references (including dynamic imports, string-based lookups)\n- Check if the code is used in tests, scripts, or configuration\n- Check git history — if it was recently added, it might be work-in-progress\n- Consider if the code is accessed via reflection, decorators, or framework magic\n\n## Rules\n- Delete with confidence, but verify with thoroughness\n- Don't replace deleted code with comments like `// removed` — just delete it\n- Group related cleanup into logical commits\n- Run tests after cleanup to catch accidental breakage\n- If a TODO is still relevant, create a proper issue/ticket for it",
     context: "main",
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     category: "Maintenance",

@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
-import { Sparkles, Bot, Loader2, RefreshCw, Puzzle, Terminal as TerminalIcon, Check, Copy, Settings2, Plus } from "lucide-react";
+import { Sparkles, Bot, RefreshCw, Puzzle, Terminal as TerminalIcon, Check, Copy, Settings2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { toolDescriptions } from "@/data/tool-descriptions";
 
 const QUICK_START_CHIPS = [
   { label: "Code reviewer", description: "An agent that reviews my code for bugs, security issues, and style problems" },
@@ -51,6 +51,18 @@ interface GeneratedConfig {
   summary: string;
 }
 
+function describeCapabilities(tools: string[]): string[] {
+  const caps: string[] = [];
+  const has = (t: string) => tools.includes(t);
+  if (has("Read") || has("Glob") || has("Grep")) caps.push("Read your files");
+  if (has("Write") || has("Edit")) caps.push("Edit your code");
+  if (has("Bash")) caps.push("Run commands");
+  if (has("WebFetch") || has("WebSearch")) caps.push("Search the web");
+  if (has("Task")) caps.push("Break work into subtasks");
+  if (caps.length === 0 && tools.length > 0) caps.push(`${tools.length} tools enabled`);
+  return caps;
+}
+
 export default function AgentBuilderPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -62,6 +74,39 @@ export default function AgentBuilderPage() {
   const [error, setError] = useState<string | null>(null);
   const [createdAgent, setCreatedAgent] = useState<{ id: string; name: string; slug: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgress = useCallback(() => {
+    setProgress(0);
+    let current = 0;
+    progressInterval.current = setInterval(() => {
+      // Slow down as we approach 90% — never reach 100% until done
+      const remaining = 90 - current;
+      const step = Math.max(0.3, remaining * 0.04);
+      current = Math.min(90, current + step);
+      setProgress(Math.round(current));
+    }, 200);
+  }, []);
+
+  const stopProgress = useCallback((success: boolean) => {
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+      progressInterval.current = null;
+    }
+    if (success) {
+      setProgress(100);
+      setTimeout(() => setProgress(0), 600);
+    } else {
+      setProgress(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (progressInterval.current) clearInterval(progressInterval.current);
+    };
+  }, []);
 
   const handleGenerate = async (desc?: string) => {
     const text = desc || description;
@@ -69,6 +114,7 @@ export default function AgentBuilderPage() {
 
     setIsGenerating(true);
     setError(null);
+    startProgress();
     try {
       const res = await fetch("/api/agents/generate", {
         method: "POST",
@@ -87,9 +133,11 @@ export default function AgentBuilderPage() {
       }
 
       const result = await res.json();
+      stopProgress(true);
       setConfig(result);
       setRefinement("");
     } catch (err) {
+      stopProgress(false);
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setIsGenerating(false);
@@ -234,10 +282,7 @@ export default function AgentBuilderPage() {
                     key={chip.label}
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setDescription(chip.description);
-                      handleGenerate(chip.description);
-                    }}
+                    onClick={() => setDescription(chip.description)}
                     disabled={isGenerating}
                   >
                     {chip.label}
@@ -247,24 +292,25 @@ export default function AgentBuilderPage() {
               {error && (
                 <p className="text-sm text-destructive">{error}</p>
               )}
-              <Button
-                className="w-full"
-                onClick={() => handleGenerate()}
-                disabled={!description.trim() || isGenerating}
-                data-testid="button-generate"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate Agent
-                  </>
-                )}
-              </Button>
+              {isGenerating ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Building your agent...</span>
+                    <span className="font-mono text-xs text-muted-foreground">{progress}%</span>
+                  </div>
+                  <Progress value={progress} className="h-2" />
+                </div>
+              ) : (
+                <Button
+                  className="w-full"
+                  onClick={() => handleGenerate()}
+                  disabled={!description.trim()}
+                  data-testid="button-generate"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Agent
+                </Button>
+              )}
             </CardContent>
           </Card>
         </>
@@ -285,31 +331,26 @@ export default function AgentBuilderPage() {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm font-medium">How it works:</h3>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    Can use: {config.agent.tools.map((t) => toolDescriptions[t] || t).join(", ")}
-                  </p>
-                  {config.agent.disallowedTools.length > 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Cannot use: {config.agent.disallowedTools.join(", ")}
-                    </p>
-                  )}
+                <h3 className="text-sm font-medium">What this agent can do:</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {describeCapabilities(config.agent.tools).map((cap) => (
+                    <Badge key={cap} variant="secondary" className="text-xs">{cap}</Badge>
+                  ))}
                 </div>
               </div>
 
               {(config.skills.length > 0 || config.commands.length > 0) && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Also included:</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <h3 className="text-sm font-medium">Extras included:</h3>
+                  <div className="flex flex-wrap gap-1.5">
                     {config.skills.map((s) => (
-                      <Badge key={s.name} variant="secondary" className="gap-1">
+                      <Badge key={s.name} variant="outline" className="gap-1 text-xs">
                         <Puzzle className="h-3 w-3" />
-                        Skill: {s.name}
+                        {s.name}
                       </Badge>
                     ))}
                     {config.commands.map((c) => (
-                      <Badge key={c.name} variant="secondary" className="gap-1">
+                      <Badge key={c.name} variant="outline" className="gap-1 text-xs">
                         <TerminalIcon className="h-3 w-3" />
                         /{c.name}
                       </Badge>
@@ -350,24 +391,25 @@ export default function AgentBuilderPage() {
                 className="min-h-[80px] text-sm"
                 data-testid="textarea-refinement"
               />
-              <Button
-                variant="outline"
-                onClick={() => handleGenerate()}
-                disabled={!refinement.trim() || isGenerating}
-                data-testid="button-refine"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Regenerating...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Update Agent
-                  </>
-                )}
-              </Button>
+              {isGenerating ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Updating your agent...</span>
+                    <span className="font-mono text-xs text-muted-foreground">{progress}%</span>
+                  </div>
+                  <Progress value={progress} className="h-2" />
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => handleGenerate()}
+                  disabled={!refinement.trim()}
+                  data-testid="button-refine"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Update Agent
+                </Button>
+              )}
             </CardContent>
           </Card>
 

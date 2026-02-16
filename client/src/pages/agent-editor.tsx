@@ -569,7 +569,7 @@ function AgentConfigForm({
               value={form.systemPrompt}
               onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
               placeholder="You are a code reviewer..."
-              className="min-h-[200px] font-mono text-sm resize-y"
+              className="min-h-[200px] font-mono text-sm overflow-hidden"
               style={{ fieldSizing: "content" } as React.CSSProperties}
               data-testid="textarea-system-prompt"
             />
@@ -585,7 +585,7 @@ function AgentConfigForm({
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
                 placeholder="e.g. Review my code for bugs, security issues, and performance problems. Suggest specific improvements with examples."
-                className="min-h-[100px] text-sm resize-y"
+                className="min-h-[100px] text-sm overflow-hidden"
                 data-testid="textarea-purpose"
               />
             </div>
@@ -598,7 +598,7 @@ function AgentConfigForm({
                 value={rules}
                 onChange={(e) => setRules(e.target.value)}
                 placeholder={"Be constructive, not critical\nAlways explain the reasoning\nDon't modify code directly"}
-                className="min-h-[80px] text-sm resize-y"
+                className="min-h-[80px] text-sm overflow-hidden"
                 data-testid="textarea-rules"
               />
             </div>
@@ -983,7 +983,7 @@ function SkillFormFields({
           value={form.instructions}
           onChange={(e) => setForm((s) => ({ ...s, instructions: e.target.value }))}
           placeholder="# Skill Instructions&#10;&#10;Describe what this skill does and how to use it..."
-          className="min-h-[200px] font-mono text-sm resize-y"
+          className="min-h-[200px] font-mono text-sm overflow-hidden break-words"
           style={{ fieldSizing: "content" } as React.CSSProperties}
           data-testid="textarea-skill-instructions"
         />
@@ -1410,7 +1410,7 @@ function CommandFormFields({
           value={form.promptTemplate}
           onChange={(e) => setForm((s) => ({ ...s, promptTemplate: e.target.value }))}
           placeholder="Review the following code for security vulnerabilities and best practices..."
-          className="min-h-[200px] font-mono text-sm resize-y"
+          className="min-h-[200px] font-mono text-sm overflow-hidden break-words"
           style={{ fieldSizing: "content" } as React.CSSProperties}
           data-testid="textarea-command-template"
         />

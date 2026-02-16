@@ -28,7 +28,7 @@ import {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const [agentTab, setAgentTab] = useState<"my" | "popular">("my");
+  const [agentTab, setAgentTab] = useState<"my" | "popular">("popular");
 
   const { data: agents = [] } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
@@ -53,39 +53,37 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Agents</SidebarGroupLabel>
-          <SidebarGroupAction asChild>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button type="button" data-testid="button-new-agent-sidebar">
-                  <Plus className="h-4 w-4" />
-                </button>
+          <Popover>
+            <SidebarGroupAction asChild>
+              <PopoverTrigger data-testid="button-new-agent-sidebar">
+                <Plus className="h-4 w-4" />
               </PopoverTrigger>
-              <PopoverContent side="right" align="start" className="w-52 p-1">
-                <Link
-                  href="/build"
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
-                  data-testid="link-guided-creation"
-                >
-                  <Wand2 className="h-4 w-4 text-primary" />
-                  <div>
-                    <div className="font-medium">Guided Creation</div>
-                    <div className="text-[11px] text-muted-foreground">Step-by-step wizard</div>
-                  </div>
-                </Link>
-                <Link
-                  href="/agents/new"
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
-                  data-testid="link-advanced-editor"
-                >
-                  <Settings2 className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <div className="font-medium">Advanced Editor</div>
-                    <div className="text-[11px] text-muted-foreground">Full manual control</div>
-                  </div>
-                </Link>
-              </PopoverContent>
-            </Popover>
-          </SidebarGroupAction>
+            </SidebarGroupAction>
+            <PopoverContent side="right" align="start" className="w-52 p-1">
+              <Link
+                href="/build"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+                data-testid="link-guided-creation"
+              >
+                <Wand2 className="h-4 w-4 text-primary" />
+                <div>
+                  <div className="font-medium">Guided Creation</div>
+                  <div className="text-[11px] text-muted-foreground">Step-by-step wizard</div>
+                </div>
+              </Link>
+              <Link
+                href="/agents/new"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+                data-testid="link-advanced-editor"
+              >
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">Advanced Editor</div>
+                  <div className="text-[11px] text-muted-foreground">Full manual control</div>
+                </div>
+              </Link>
+            </PopoverContent>
+          </Popover>
           <SidebarGroupContent>
             <div className="flex gap-1 px-2 mb-1">
               <button
