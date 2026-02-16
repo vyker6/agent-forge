@@ -44,7 +44,8 @@
       "Bash(pkill:*)",
       "Bash(echo:*)",
       "Bash(jobs:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npx drizzle-kit push:*)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { Sparkles, Bot, Loader2, RefreshCw, Puzzle, Terminal as TerminalIcon } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Sparkles, Bot, Loader2, RefreshCw, Puzzle, Terminal as TerminalIcon, Check, Copy, Settings2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +60,8 @@ export default function AgentBuilderPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [config, setConfig] = useState<GeneratedConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createdAgent, setCreatedAgent] = useState<{ id: string; name: string; slug: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleGenerate = async (desc?: string) => {
     const text = desc || description;
@@ -131,12 +133,8 @@ export default function AgentBuilderPage() {
 
       queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
 
-      toast({
-        title: "Agent created!",
-        description: `"${config.agent.name}" is ready to use`,
-      });
-
-      navigate(`/agents/${agent.id}`);
+      const slug = config.agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      setCreatedAgent({ id: agent.id, name: config.agent.name, slug });
     } catch (err) {
       toast({
         title: "Creation failed",
@@ -147,6 +145,68 @@ export default function AgentBuilderPage() {
       setIsCreating(false);
     }
   };
+
+  if (createdAgent) {
+    const cliCommand = `claude agent add ${createdAgent.slug}`;
+    const handleCopy = () => {
+      navigator.clipboard.writeText(cliCommand);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+    return (
+      <div className="p-6 space-y-6 max-w-3xl mx-auto">
+        <div className="flex flex-col items-center text-center gap-4 py-8">
+          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+            <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Agent Created!</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              <strong>{createdAgent.name}</strong> is ready to install
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Install via CLI</h3>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted p-3 rounded-md text-xs font-mono overflow-auto">
+                  {cliCommand}
+                </code>
+                <Button variant="outline" size="icon" onClick={handleCopy} data-testid="button-copy-cli">
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-3">
+          <Button asChild className="flex-1" data-testid="button-open-editor">
+            <Link href={`/agents/${createdAgent.id}`}>
+              <Settings2 className="h-4 w-4 mr-2" />
+              Open in Editor
+            </Link>
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => {
+              setCreatedAgent(null);
+              setConfig(null);
+              setDescription("");
+            }}
+            data-testid="button-create-another"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Another
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">

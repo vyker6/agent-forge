@@ -136,6 +136,13 @@ export const mcpServers = pgTable("mcp_servers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const agentLikes = pgTable("agent_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertAgentSchema = createInsertSchema(agents).omit({ id: true, createdAt: true });
 export const insertSkillSchema = createInsertSchema(skills).omit({ id: true, createdAt: true });
 export const insertCommandSchema = createInsertSchema(commands).omit({ id: true, createdAt: true });
@@ -171,6 +178,8 @@ export type Hook = typeof hooks.$inferSelect;
 export const insertMcpServerSchema = createInsertSchema(mcpServers).omit({ id: true, createdAt: true });
 export type InsertMcpServer = z.infer<typeof insertMcpServerSchema>;
 export type McpServer = typeof mcpServers.$inferSelect;
+
+export type AgentLike = typeof agentLikes.$inferSelect;
 
 export const AVAILABLE_TOOLS = [
   "Read", "Write", "Edit", "Bash", "Glob", "Grep",

@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, MoreVertical, Trash2, Copy, MessageSquarePlus } from "lucide-react";
+import { Plus, MoreVertical, Trash2, Copy, MessageSquarePlus, Heart, Download, Terminal as TerminalIcon } from "lucide-react";
 import type { Agent } from "@shared/schema";
 import { AVAILABLE_MODELS, MEMORY_SCOPES } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getClientId } from "@/lib/client-id";
+import { generateAgentMarkdown } from "@/lib/generate-markdown";
 
 export default function AgentsPage() {
   const { toast } = useToast();
@@ -26,6 +28,10 @@ export default function AgentsPage() {
 
   const { data: aiStatus } = useQuery<{ available: boolean }>({
     queryKey: ["/api/ai/status"],
+  });
+
+  const { data: likeCounts = {} } = useQuery<Record<string, number>>({
+    queryKey: ["/api/likes"],
   });
 
   const deleteMutation = useMutation({
@@ -48,6 +54,44 @@ export default function AgentsPage() {
       toast({ title: "Agent duplicated" });
     },
   });
+
+  const likeMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const res = await fetch(`/api/agents/${agentId}/like`, {
+        method: "POST",
+        headers: { "X-Client-Id": getClientId() },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Like failed");
+      return res.json() as Promise<{ liked: boolean; count: number }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/likes"] });
+    },
+  });
+
+  const handleCopyInstall = (agent: Agent) => {
+    const slug = agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    navigator.clipboard.writeText(`claude agent add ${slug}`);
+    toast({ title: "Install command copied" });
+  };
+
+  const handleDownload = (agent: Agent) => {
+    const slug = agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const files = generateAgentMarkdown(agent, [], []);
+    const agentFile = Object.entries(files).find(([path]) => path.endsWith("AGENT.md"));
+    const content = agentFile ? agentFile[1] : Object.values(files)[0] ?? "";
+    const blob = new Blob([content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Agent file downloaded" });
+  };
 
   if (isLoading) {
     return (
@@ -130,6 +174,7 @@ export default function AgentsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {agents?.map((agent) => {
             const modelLabel = AVAILABLE_MODELS.find((m) => m.value === agent.model)?.label || agent.model;
+            const likeCount = likeCounts[agent.id] ?? 0;
             return (
               <Card key={agent.id} className="group hover-elevate" data-testid={`card-agent-${agent.id}`}>
                 <CardContent className="p-4">
@@ -193,6 +238,37 @@ export default function AgentsPage() {
                     <Badge variant="outline" className="text-[10px]">
                       {MEMORY_SCOPES.find((s) => s.value === agent.memoryScope)?.label ?? agent.memoryScope}
                     </Badge>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => likeMutation.mutate(agent.id)}
+                      data-testid={`button-like-${agent.id}`}
+                    >
+                      <Heart className="h-3.5 w-3.5" />
+                      <span>{likeCount > 0 ? likeCount : ""}</span>
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
+                        onClick={() => handleCopyInstall(agent)}
+                        title="Copy install command"
+                        data-testid={`button-install-${agent.id}`}
+                      >
+                        <TerminalIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
+                        onClick={() => handleDownload(agent)}
+                        title="Download agent file"
+                        data-testid={`button-download-${agent.id}`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

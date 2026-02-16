@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import {
   ArrowLeft, Save, FileText, Puzzle, Terminal as TerminalIcon,
-  FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File, Eye
+  FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File, Eye,
+  ChevronDown, Copy, Check, Download
 } from "lucide-react";
 import type { Agent, Skill, Command, FileMapEntry, InsertAgent, McpServer, ProjectAgent } from "@shared/schema";
 import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES, PERMISSION_MODES } from "@shared/schema";
@@ -30,7 +31,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,6 +48,54 @@ import { generateAgentMarkdown } from "@/lib/generate-markdown";
 import { FieldTooltip } from "@/components/field-tooltip";
 import { HelpSection } from "@/components/help-section";
 import { toolDescriptions } from "@/data/tool-descriptions";
+import { skillCatalog } from "@/data/skill-catalog";
+
+const TOOL_BUNDLES = [
+  { value: "readonly", label: "Read-Only", description: "Can read and search files", tools: ["Read", "Glob", "Grep"] },
+  { value: "readwrite", label: "Read & Write", description: "Can read, search, and edit files", tools: ["Read", "Write", "Edit", "Glob", "Grep"] },
+  { value: "full", label: "Full Access", description: "Can do everything including run commands", tools: [...AVAILABLE_TOOLS] },
+] as const;
+
+const TONE_OPTIONS = [
+  { value: "professional", label: "Professional", prompt: "Use a professional, clear tone." },
+  { value: "friendly", label: "Friendly", prompt: "Use a friendly, approachable tone." },
+  { value: "concise", label: "Concise", prompt: "Be brief and to the point." },
+  { value: "detailed", label: "Detailed", prompt: "Provide thorough, detailed explanations." },
+] as const;
+
+function composeSystemPrompt(purpose: string, rules: string, tone: string): string {
+  const parts: string[] = [];
+  if (purpose.trim()) parts.push(purpose.trim());
+  if (rules.trim()) {
+    parts.push("Rules:\n" + rules.trim().split("\n").map((r) => r.trim()).filter(Boolean).map((r) => `- ${r}`).join("\n"));
+  }
+  const tonePrompt = TONE_OPTIONS.find((t) => t.value === tone)?.prompt;
+  if (tonePrompt) parts.push(tonePrompt);
+  return parts.join("\n\n");
+}
+
+function decomposeSystemPrompt(prompt: string): { purpose: string; rules: string; tone: string } {
+  if (!prompt) return { purpose: "", rules: "", tone: "professional" };
+  const rulesMatch = prompt.match(/Rules:\n((?:- .+\n?)+)/);
+  const tone = TONE_OPTIONS.find((t) => prompt.includes(t.prompt))?.value || "professional";
+  let purpose = prompt;
+  if (rulesMatch) purpose = purpose.replace(rulesMatch[0], "").trim();
+  const tonePrompt = TONE_OPTIONS.find((t) => t.value === tone)?.prompt;
+  if (tonePrompt) purpose = purpose.replace(tonePrompt, "").trim();
+  const rules = rulesMatch
+    ? rulesMatch[1].split("\n").map((l) => l.replace(/^- /, "").trim()).filter(Boolean).join("\n")
+    : "";
+  return { purpose, rules, tone };
+}
+
+function getActiveBundle(tools: string[]): string {
+  for (const bundle of [...TOOL_BUNDLES].reverse()) {
+    if (bundle.tools.every((t) => tools.includes(t)) && tools.length === bundle.tools.length) {
+      return bundle.value;
+    }
+  }
+  return "custom";
+}
 
 export default function AgentEditorPage() {
   const [, params] = useRoute("/agents/:id");
@@ -205,10 +260,15 @@ export default function AgentEditorPage() {
             </p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-agent">
-          <Save className="h-4 w-4 mr-2" />
-          {saveMutation.isPending ? "Saving..." : "Save"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {!isNew && (
+            <InstallModal agentName={form.name} form={form} skills={skills} commands={commands} />
+          )}
+          <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-agent">
+            <Save className="h-4 w-4 mr-2" />
+            {saveMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -306,6 +366,96 @@ export default function AgentEditorPage() {
   );
 }
 
+function InstallModal({
+  agentName,
+  form,
+  skills,
+  commands,
+}: {
+  agentName: string;
+  form: InsertAgent;
+  skills: Skill[];
+  commands: Command[];
+}) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const slug = agentName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "my-agent";
+  const cliCommand = `claude agent add ${slug}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(cliCommand);
+    setCopied(true);
+    toast({ title: "Copied to clipboard" });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const agentData = {
+      name: form.name,
+      description: form.description ?? "",
+      tools: form.tools ?? [],
+      disallowedTools: form.disallowedTools ?? [],
+      model: form.model ?? "sonnet",
+      memoryScope: form.memoryScope ?? "project",
+      permissionMode: form.permissionMode ?? "default",
+      maxTurns: form.maxTurns ?? null,
+      preloadedSkills: form.preloadedSkills ?? [],
+      mcpServers: form.mcpServers ?? [],
+      systemPrompt: form.systemPrompt ?? "",
+    };
+    const files = generateAgentMarkdown(agentData, skills, commands);
+    const agentFile = Object.entries(files).find(([path]) => path.endsWith(`${slug}/AGENT.md`));
+    const content = agentFile ? agentFile[1] : Object.values(files)[0] ?? "";
+    const blob = new Blob([content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Agent file downloaded" });
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" data-testid="button-install-agent">
+          <Download className="h-4 w-4 mr-2" />
+          Install
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Install Agent</DialogTitle>
+          <DialogDescription>
+            Add this agent to your project using the CLI or download the file directly.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">CLI Command</Label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-muted p-3 rounded-md text-xs font-mono overflow-auto">
+                {cliCommand}
+              </code>
+              <Button variant="outline" size="icon" onClick={handleCopy} data-testid="button-copy-install">
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+          <Separator />
+          <Button variant="secondary" className="w-full" onClick={handleDownload} data-testid="button-download-agent">
+            <Download className="h-4 w-4 mr-2" />
+            Download as .md File
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AgentConfigForm({
   form,
   setForm,
@@ -321,8 +471,36 @@ function AgentConfigForm({
   skills: Skill[];
   projectMcpServers: McpServer[];
 }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [rawMode, setRawMode] = useState(false);
+  const [purpose, setPurpose] = useState(() => decomposeSystemPrompt(form.systemPrompt ?? "").purpose);
+  const [rules, setRules] = useState(() => decomposeSystemPrompt(form.systemPrompt ?? "").rules);
+  const [tone, setTone] = useState(() => decomposeSystemPrompt(form.systemPrompt ?? "").tone);
+
+  // Sync structured fields → systemPrompt (only in structured mode)
+  useEffect(() => {
+    if (!rawMode) {
+      const composed = composeSystemPrompt(purpose, rules, tone);
+      if (composed !== form.systemPrompt) {
+        setForm((f) => ({ ...f, systemPrompt: composed }));
+      }
+    }
+  }, [purpose, rules, tone, rawMode]);
+
+  // When switching to structured mode, decompose current prompt
+  const switchToStructured = () => {
+    const decomposed = decomposeSystemPrompt(form.systemPrompt ?? "");
+    setPurpose(decomposed.purpose);
+    setRules(decomposed.rules);
+    setTone(decomposed.tone);
+    setRawMode(false);
+  };
+
+  const activeBundle = getActiveBundle(form.tools ?? []);
+
   return (
     <div className="space-y-6">
+      {/* === ESSENTIALS === */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr,auto] gap-6">
         <div className="space-y-4">
           <div className="space-y-2">
@@ -366,91 +544,113 @@ function AgentConfigForm({
 
       <Separator />
 
-      <HelpSection section="instructions" />
+      {/* === INSTRUCTIONS (Structured Builder / Raw) === */}
       <div className="space-y-2">
-        <div className="flex items-center gap-1">
-          <Label htmlFor="systemPrompt">Instructions</Label>
-          <FieldTooltip field="systemPrompt" />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          The core instructions that define this agent's behavior and expertise
-        </p>
-        <Textarea
-          id="systemPrompt"
-          value={form.systemPrompt}
-          onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
-          placeholder="You are a code reviewer. Analyze code and provide specific, actionable feedback on..."
-          className="min-h-[200px] font-mono text-sm"
-          data-testid="textarea-system-prompt"
-        />
-        {!form.systemPrompt && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <Label>Instructions</Label>
+            <FieldTooltip field="systemPrompt" />
+          </div>
           <button
             type="button"
-            className="text-xs text-primary hover:underline"
-            onClick={() =>
-              setForm((f) => ({
-                ...f,
-                systemPrompt:
-                  "You are a specialized code reviewer. When asked to review code:\n\n1. Analyze the code for bugs, security issues, and performance problems\n2. Check for adherence to best practices and coding standards\n3. Suggest specific improvements with code examples\n4. Be constructive and explain the reasoning behind each suggestion",
-              }))
-            }
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => rawMode ? switchToStructured() : setRawMode(true)}
           >
-            Try an example prompt
+            {rawMode ? "Switch to guided editor" : "Switch to raw editor"}
           </button>
+        </div>
+
+        {rawMode ? (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Write the full system prompt directly
+            </p>
+            <Textarea
+              value={form.systemPrompt}
+              onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
+              placeholder="You are a code reviewer..."
+              className="min-h-[200px] font-mono text-sm resize-y"
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+              data-testid="textarea-system-prompt"
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="purpose" className="text-sm font-normal text-muted-foreground">
+                What should this agent do?
+              </Label>
+              <Textarea
+                id="purpose"
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+                placeholder="e.g. Review my code for bugs, security issues, and performance problems. Suggest specific improvements with examples."
+                className="min-h-[100px] text-sm resize-y"
+                data-testid="textarea-purpose"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rules" className="text-sm font-normal text-muted-foreground">
+                What rules should it follow? (one per line)
+              </Label>
+              <Textarea
+                id="rules"
+                value={rules}
+                onChange={(e) => setRules(e.target.value)}
+                placeholder={"Be constructive, not critical\nAlways explain the reasoning\nDon't modify code directly"}
+                className="min-h-[80px] text-sm resize-y"
+                data-testid="textarea-rules"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-normal text-muted-foreground">
+                What tone should it use?
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {TONE_OPTIONS.map((t) => (
+                  <Badge
+                    key={t.value}
+                    variant={tone === t.value ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => setTone(t.value)}
+                  >
+                    {t.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
       <Separator />
 
-      <HelpSection section="model" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-1">
-            <Label>AI Model</Label>
-            <FieldTooltip field="model" />
-          </div>
-          <Select
-            value={form.model}
-            onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
-          >
-            <SelectTrigger data-testid="select-model">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_MODELS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* === MODEL === */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1">
+          <Label>AI Model</Label>
+          <FieldTooltip field="model" />
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center gap-1">
-            <Label>What It Remembers</Label>
-            <FieldTooltip field="memoryScope" />
-          </div>
-          <Select
-            value={form.memoryScope}
-            onValueChange={(v) => setForm((f) => ({ ...f, memoryScope: v }))}
-          >
-            <SelectTrigger data-testid="select-memory-scope">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MEMORY_SCOPES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select
+          value={form.model}
+          onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
+        >
+          <SelectTrigger data-testid="select-model">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {AVAILABLE_MODELS.map((m) => (
+              <SelectItem key={m.value} value={m.value}>
+                {m.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Separator />
 
-      <HelpSection section="capabilities" />
+      {/* === CAPABILITIES (Bundles) === */}
       <div className="space-y-3">
         <div>
           <div className="flex items-center gap-1">
@@ -458,187 +658,245 @@ function AgentConfigForm({
             <FieldTooltip field="tools" />
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            What this agent can do
+            What this agent is allowed to do
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {AVAILABLE_TOOLS.map((tool) => (
-            <Badge
-              key={tool}
-              variant={(form.tools ?? []).includes(tool) ? "default" : "outline"}
-              className={`cursor-pointer toggle-elevate ${(form.tools ?? []).includes(tool) ? "toggle-elevated" : ""}`}
-              onClick={() => toggleTool(tool)}
-              data-testid={`badge-tool-${tool}`}
-              title={toolDescriptions[tool] || tool}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {TOOL_BUNDLES.map((bundle) => (
+            <button
+              key={bundle.value}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, tools: [...bundle.tools] }))}
+              className={`flex flex-col items-start gap-1 p-3 rounded-lg border text-left text-sm transition-colors ${
+                activeBundle === bundle.value
+                  ? "border-primary bg-primary/5"
+                  : "hover:bg-accent"
+              }`}
+              data-testid={`bundle-${bundle.value}`}
             >
-              {tool}
-            </Badge>
+              <span className="font-medium">{bundle.label}</span>
+              <span className="text-xs text-muted-foreground">{bundle.description}</span>
+            </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 mt-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setForm((f) => ({ ...f, tools: [...AVAILABLE_TOOLS] }))}
-            data-testid="button-select-all-tools"
-          >
-            Select All
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setForm((f) => ({ ...f, tools: [] }))}
-            data-testid="button-clear-tools"
-          >
-            Clear All
-          </Button>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <div>
-          <Label>Restricted Capabilities</Label>
-          <p className="text-xs text-muted-foreground mt-1">
-            Capabilities this agent is never allowed to use, even if otherwise available
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {AVAILABLE_TOOLS.map((tool) => (
-            <Badge
-              key={tool}
-              variant={(form.disallowedTools ?? []).includes(tool) ? "destructive" : "outline"}
-              className="cursor-pointer"
-              onClick={() => toggleDisallowedTool(tool)}
-              title={toolDescriptions[tool] || tool}
-            >
-              {tool}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-1">
-            <Label>How It Asks for Permission</Label>
-            <FieldTooltip field="permissionMode" />
-          </div>
+        {activeBundle === "custom" && (
           <p className="text-xs text-muted-foreground">
-            What happens when this agent needs approval to do something
+            Custom tool selection (edit in Advanced Settings below)
           </p>
-          <Select
-            value={form.permissionMode ?? "default"}
-            onValueChange={(v) => setForm((f) => ({ ...f, permissionMode: v }))}
+        )}
+      </div>
+
+      <Separator />
+
+      {/* === ADVANCED SETTINGS (Collapsible) === */}
+      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-2 w-full text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
           >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PERMISSION_MODES.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
+            <ChevronDown className={`h-4 w-4 transition-transform ${advancedOpen ? "" : "-rotate-90"}`} />
+            Advanced Settings
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-6 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <Label>What It Remembers</Label>
+                <FieldTooltip field="memoryScope" />
+              </div>
+              <Select
+                value={form.memoryScope}
+                onValueChange={(v) => setForm((f) => ({ ...f, memoryScope: v }))}
+              >
+                <SelectTrigger data-testid="select-memory-scope">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MEMORY_SCOPES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <Label>Permission Mode</Label>
+                <FieldTooltip field="permissionMode" />
+              </div>
+              <Select
+                value={form.permissionMode ?? "default"}
+                onValueChange={(v) => setForm((f) => ({ ...f, permissionMode: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERMISSION_MODES.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <Label>Conversation Limit</Label>
+                <FieldTooltip field="maxTurns" />
+              </div>
+              <Select
+                value={form.maxTurns != null ? String(form.maxTurns) : "_unlimited"}
+                onValueChange={(v) => setForm((f) => ({
+                  ...f,
+                  maxTurns: v === "_unlimited" ? null : parseInt(v, 10),
+                }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_unlimited">Unlimited</SelectItem>
+                  <SelectItem value="5">5 turns</SelectItem>
+                  <SelectItem value="10">10 turns</SelectItem>
+                  <SelectItem value="15">15 turns</SelectItem>
+                  <SelectItem value="20">20 turns</SelectItem>
+                  <SelectItem value="25">25 turns</SelectItem>
+                  <SelectItem value="50">50 turns</SelectItem>
+                  <SelectItem value="100">100 turns</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Separator />
+
+          <HelpSection section="capabilities" />
+          <div className="space-y-3">
+            <div>
+              <Label>Individual Tools</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Fine-tune exactly which tools this agent can use
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_TOOLS.map((tool) => (
+                <Badge
+                  key={tool}
+                  variant={(form.tools ?? []).includes(tool) ? "default" : "outline"}
+                  className={`cursor-pointer toggle-elevate ${(form.tools ?? []).includes(tool) ? "toggle-elevated" : ""}`}
+                  onClick={() => toggleTool(tool)}
+                  data-testid={`badge-tool-${tool}`}
+                  title={toolDescriptions[tool] || tool}
+                >
+                  {tool}
+                </Badge>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center gap-1">
-            <Label>Conversation Limit</Label>
-            <FieldTooltip field="maxTurns" />
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Maximum back-and-forth steps (blank = no limit)
-          </p>
-          <Input
-            type="number"
-            min={1}
-            value={form.maxTurns ?? ""}
-            onChange={(e) => setForm((f) => ({
-              ...f,
-              maxTurns: e.target.value ? parseInt(e.target.value, 10) : null,
-            }))}
-            placeholder="Unlimited"
-          />
-        </div>
-      </div>
 
-      {skills.length > 0 && (
-        <>
-          <Separator />
           <div className="space-y-3">
             <div>
-              <Label>Preloaded Skills</Label>
+              <Label>Restricted Tools</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Skills whose content is injected into this agent&apos;s context at startup
+                Tools this agent can never use
               </p>
             </div>
-            <div className="space-y-2">
-              {skills.map((skill) => {
-                const slug = skill.name.toLowerCase().replace(/\s+/g, "-");
-                const checked = (form.preloadedSkills ?? []).includes(slug);
-                return (
-                  <label key={skill.id} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={(val) => {
-                        setForm((f) => ({
-                          ...f,
-                          preloadedSkills: val
-                            ? [...(f.preloadedSkills ?? []), slug]
-                            : (f.preloadedSkills ?? []).filter((s: string) => s !== slug),
-                        }));
-                      }}
-                    />
-                    <span className="text-sm">{skill.name}</span>
-                    <span className="text-xs text-muted-foreground">({slug})</span>
-                  </label>
-                );
-              })}
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_TOOLS.map((tool) => (
+                <Badge
+                  key={tool}
+                  variant={(form.disallowedTools ?? []).includes(tool) ? "destructive" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleDisallowedTool(tool)}
+                  title={toolDescriptions[tool] || tool}
+                >
+                  {tool}
+                </Badge>
+              ))}
             </div>
           </div>
-        </>
-      )}
 
-      {projectMcpServers.length > 0 && (
-        <>
-          <Separator />
-          <div className="space-y-3">
-            <div>
-              <Label>MCP Servers</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                MCP servers this agent has access to
-              </p>
-            </div>
-            <div className="space-y-2">
-              {projectMcpServers.map((server) => {
-                const checked = (form.mcpServers ?? []).includes(server.name);
-                return (
-                  <label key={server.id} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={(val) => {
-                        setForm((f) => ({
-                          ...f,
-                          mcpServers: val
-                            ? [...(f.mcpServers ?? []), server.name]
-                            : (f.mcpServers ?? []).filter((s: string) => s !== server.name),
-                        }));
-                      }}
-                    />
-                    <span className="text-sm">{server.name}</span>
-                    <span className="text-xs text-muted-foreground">({server.command})</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
+          {skills.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div>
+                  <Label>Preloaded Skills</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Skills loaded into this agent&apos;s context at startup
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {skills.map((skill) => {
+                    const slug = skill.name.toLowerCase().replace(/\s+/g, "-");
+                    const checked = (form.preloadedSkills ?? []).includes(slug);
+                    return (
+                      <label key={skill.id} className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(val) => {
+                            setForm((f) => ({
+                              ...f,
+                              preloadedSkills: val
+                                ? [...(f.preloadedSkills ?? []), slug]
+                                : (f.preloadedSkills ?? []).filter((s: string) => s !== slug),
+                            }));
+                          }}
+                        />
+                        <span className="text-sm">{skill.name}</span>
+                        <span className="text-xs text-muted-foreground">({slug})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {projectMcpServers.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div>
+                  <Label>MCP Servers</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    MCP servers this agent has access to
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {projectMcpServers.map((server) => {
+                    const checked = (form.mcpServers ?? []).includes(server.name);
+                    return (
+                      <label key={server.id} className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(val) => {
+                            setForm((f) => ({
+                              ...f,
+                              mcpServers: val
+                                ? [...(f.mcpServers ?? []), server.name]
+                                : (f.mcpServers ?? []).filter((s: string) => s !== server.name),
+                            }));
+                          }}
+                        />
+                        <span className="text-sm">{server.name}</span>
+                        <span className="text-xs text-muted-foreground">({server.command})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
@@ -725,7 +983,8 @@ function SkillFormFields({
           value={form.instructions}
           onChange={(e) => setForm((s) => ({ ...s, instructions: e.target.value }))}
           placeholder="# Skill Instructions&#10;&#10;Describe what this skill does and how to use it..."
-          className="min-h-[150px] font-mono text-sm"
+          className="min-h-[200px] font-mono text-sm resize-y"
+          style={{ fieldSizing: "content" } as React.CSSProperties}
           data-testid="textarea-skill-instructions"
         />
       </div>
@@ -834,6 +1093,7 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
   const { toast } = useToast();
   const [showNew, setShowNew] = useState(false);
   const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+  const [catalogSearch, setCatalogSearch] = useState("");
 
   const emptySkillForm = {
     name: "",
@@ -924,6 +1184,48 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
       {showNew && (
         <Card>
           <CardContent className="p-4 space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-1">
+                <Label className="text-sm font-medium">Browse Catalog</Label>
+                <span className="text-xs text-muted-foreground">— click to populate form</span>
+              </div>
+              <Input
+                placeholder="Search skills..."
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                data-testid="input-catalog-search"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[200px] overflow-auto">
+                {skillCatalog
+                  .filter((s) => {
+                    const q = catalogSearch.toLowerCase();
+                    return !q || s.name.includes(q) || s.description.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
+                  })
+                  .map((cat) => (
+                    <button
+                      key={cat.name}
+                      type="button"
+                      className="flex flex-col items-start gap-0.5 p-2 rounded-md border text-left text-xs hover:bg-accent transition-colors"
+                      onClick={() => {
+                        setNewSkill((prev) => ({
+                          ...prev,
+                          name: cat.name,
+                          description: cat.description,
+                          instructions: cat.instructions,
+                          context: cat.context,
+                          allowedTools: [...cat.allowedTools],
+                        }));
+                        setCatalogSearch("");
+                      }}
+                      data-testid={`catalog-skill-${cat.name}`}
+                    >
+                      <span className="font-medium">{cat.name}</span>
+                      <span className="text-muted-foreground line-clamp-1">{cat.description}</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+            <Separator />
             <SkillFormFields form={newSkill} setForm={setNewSkill} />
             <div className="flex items-center gap-2 justify-end">
               <Button
@@ -1108,7 +1410,8 @@ function CommandFormFields({
           value={form.promptTemplate}
           onChange={(e) => setForm((s) => ({ ...s, promptTemplate: e.target.value }))}
           placeholder="Review the following code for security vulnerabilities and best practices..."
-          className="min-h-[120px] font-mono text-sm"
+          className="min-h-[200px] font-mono text-sm resize-y"
+          style={{ fieldSizing: "content" } as React.CSSProperties}
           data-testid="textarea-command-template"
         />
       </div>

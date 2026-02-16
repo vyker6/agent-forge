@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, and, sql, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import {
   agents, skills, commands, fileMapEntries, projects, projectAgents,
-  rules, projectSettings, hooks, mcpServers,
+  rules, projectSettings, hooks, mcpServers, agentLikes,
   type Agent, type InsertAgent,
   type Skill, type InsertSkill,
   type Command, type InsertCommand,
@@ -69,6 +69,11 @@ export interface IStorage {
   createMcpServer(data: InsertMcpServer): Promise<McpServer>;
   updateMcpServer(id: string, data: Partial<InsertMcpServer>): Promise<McpServer | undefined>;
   deleteMcpServer(id: string): Promise<void>;
+
+  toggleLike(agentId: string, clientId: string): Promise<boolean>;
+  getLikeCount(agentId: string): Promise<number>;
+  getLikeCounts(): Promise<Record<string, number>>;
+  hasLiked(agentId: string, clientId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -259,6 +264,41 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMcpServer(id: string): Promise<void> {
     await db.delete(mcpServers).where(eq(mcpServers.id, id));
+  }
+
+  async toggleLike(agentId: string, clientId: string): Promise<boolean> {
+    const existing = await db.select().from(agentLikes)
+      .where(and(eq(agentLikes.agentId, agentId), eq(agentLikes.clientId, clientId)));
+    if (existing.length > 0) {
+      await db.delete(agentLikes).where(eq(agentLikes.id, existing[0].id));
+      return false;
+    }
+    await db.insert(agentLikes).values({ agentId, clientId });
+    return true;
+  }
+
+  async getLikeCount(agentId: string): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(agentLikes)
+      .where(eq(agentLikes.agentId, agentId));
+    return result?.count ?? 0;
+  }
+
+  async getLikeCounts(): Promise<Record<string, number>> {
+    const rows = await db.select({
+      agentId: agentLikes.agentId,
+      count: count(),
+    }).from(agentLikes).groupBy(agentLikes.agentId);
+    const map: Record<string, number> = {};
+    for (const row of rows) {
+      map[row.agentId] = row.count;
+    }
+    return map;
+  }
+
+  async hasLiked(agentId: string, clientId: string): Promise<boolean> {
+    const existing = await db.select().from(agentLikes)
+      .where(and(eq(agentLikes.agentId, agentId), eq(agentLikes.clientId, clientId)));
+    return existing.length > 0;
   }
 }
 

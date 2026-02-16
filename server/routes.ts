@@ -588,6 +588,27 @@ export async function registerRoutes(
     await archive.finalize();
   });
 
+  // Agent likes endpoints
+  app.post("/api/agents/:id/like", async (req, res) => {
+    const clientId = req.headers["x-client-id"] as string;
+    if (!clientId) return res.status(400).json({ error: "X-Client-Id header required" });
+    const liked = await storage.toggleLike(req.params.id, clientId);
+    const count = await storage.getLikeCount(req.params.id);
+    res.json({ liked, count });
+  });
+
+  app.get("/api/agents/:id/likes", async (req, res) => {
+    const clientId = req.headers["x-client-id"] as string;
+    const count = await storage.getLikeCount(req.params.id);
+    const liked = clientId ? await storage.hasLiked(req.params.id, clientId) : false;
+    res.json({ count, liked });
+  });
+
+  app.get("/api/likes", async (_req, res) => {
+    const counts = await storage.getLikeCounts();
+    res.json(counts);
+  });
+
   // AI generation endpoints
   app.get("/api/ai/status", (_req, res) => {
     res.json({ available: isAiAvailable() });
