@@ -39,6 +39,8 @@ import { useToast } from "@/hooks/use-toast";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { generateAgentMarkdown } from "@/lib/generate-markdown";
 import { FieldTooltip } from "@/components/field-tooltip";
+import { HelpSection } from "@/components/help-section";
+import { toolDescriptions } from "@/data/tool-descriptions";
 
 export default function AgentEditorPage() {
   const [, params] = useRoute("/agents/:id");
@@ -362,9 +364,10 @@ function AgentConfigForm({
 
       <Separator />
 
+      <HelpSection section="instructions" />
       <div className="space-y-2">
         <div className="flex items-center gap-1">
-          <Label htmlFor="systemPrompt">System Prompt / Instructions</Label>
+          <Label htmlFor="systemPrompt">Instructions</Label>
           <FieldTooltip field="systemPrompt" />
         </div>
         <p className="text-xs text-muted-foreground">
@@ -397,10 +400,11 @@ function AgentConfigForm({
 
       <Separator />
 
+      <HelpSection section="model" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-1">
-            <Label>Model</Label>
+            <Label>AI Model</Label>
             <FieldTooltip field="model" />
           </div>
           <Select
@@ -421,7 +425,7 @@ function AgentConfigForm({
         </div>
         <div className="space-y-2">
           <div className="flex items-center gap-1">
-            <Label>Memory Scope</Label>
+            <Label>What It Remembers</Label>
             <FieldTooltip field="memoryScope" />
           </div>
           <Select
@@ -444,14 +448,15 @@ function AgentConfigForm({
 
       <Separator />
 
+      <HelpSection section="capabilities" />
       <div className="space-y-3">
         <div>
           <div className="flex items-center gap-1">
-            <Label>Allowed Tools</Label>
+            <Label>Capabilities</Label>
             <FieldTooltip field="tools" />
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Select which tools this agent can use
+            What this agent can do
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -462,6 +467,7 @@ function AgentConfigForm({
               className={`cursor-pointer toggle-elevate ${(form.tools ?? []).includes(tool) ? "toggle-elevated" : ""}`}
               onClick={() => toggleTool(tool)}
               data-testid={`badge-tool-${tool}`}
+              title={toolDescriptions[tool] || tool}
             >
               {tool}
             </Badge>
@@ -491,9 +497,9 @@ function AgentConfigForm({
 
       <div className="space-y-3">
         <div>
-          <Label>Disallowed Tools</Label>
+          <Label>Restricted Capabilities</Label>
           <p className="text-xs text-muted-foreground mt-1">
-            Tools this agent is explicitly denied from using
+            Capabilities this agent is never allowed to use, even if otherwise available
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -503,6 +509,7 @@ function AgentConfigForm({
               variant={(form.disallowedTools ?? []).includes(tool) ? "destructive" : "outline"}
               className="cursor-pointer"
               onClick={() => toggleDisallowedTool(tool)}
+              title={toolDescriptions[tool] || tool}
             >
               {tool}
             </Badge>
@@ -515,11 +522,11 @@ function AgentConfigForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-1">
-            <Label>Permission Mode</Label>
+            <Label>How It Asks for Permission</Label>
             <FieldTooltip field="permissionMode" />
           </div>
           <p className="text-xs text-muted-foreground">
-            How the agent handles permission requests
+            What happens when this agent needs approval to do something
           </p>
           <Select
             value={form.permissionMode ?? "default"}
@@ -539,11 +546,11 @@ function AgentConfigForm({
         </div>
         <div className="space-y-2">
           <div className="flex items-center gap-1">
-            <Label>Max Turns</Label>
+            <Label>Conversation Limit</Label>
             <FieldTooltip field="maxTurns" />
           </div>
           <p className="text-xs text-muted-foreground">
-            Limit agentic turns (blank = unlimited)
+            Maximum back-and-forth steps (blank = no limit)
           </p>
           <Input
             type="number"

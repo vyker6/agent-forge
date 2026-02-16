@@ -34,6 +34,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { HelpSection } from "@/components/help-section";
+import { hookEventDisplayNames } from "@/data/tool-descriptions";
 
 export default function ProjectEditorPage() {
   const [, params] = useRoute("/projects/:id");
@@ -206,7 +208,7 @@ export default function ProjectEditorPage() {
                 data-testid="tab-hooks"
               >
                 <Webhook className="h-4 w-4 mr-1.5" />
-                Hooks
+                Automations
                 {projectHooks.length > 0 && (
                   <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">{projectHooks.length}</Badge>
                 )}
@@ -217,7 +219,7 @@ export default function ProjectEditorPage() {
                 data-testid="tab-mcp-servers"
               >
                 <Server className="h-4 w-4 mr-1.5" />
-                MCP Servers
+                Connections
                 {projectMcpServers.length > 0 && (
                   <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">{projectMcpServers.length}</Badge>
                 )}
@@ -307,10 +309,11 @@ function OverviewTab({
 
       <Separator />
 
+      <HelpSection section="claudeMd" />
       <div className="space-y-2">
-        <Label htmlFor="claude-md">CLAUDE.md Content</Label>
+        <Label htmlFor="claude-md">Project Instructions</Label>
         <p className="text-xs text-muted-foreground">
-          The main project instructions file that guides Claude's behavior
+          The main instructions every agent in this project will see
         </p>
         <Textarea
           id="claude-md"
@@ -725,14 +728,14 @@ function SettingsTab({ projectId, settings }: { projectId: string; settings?: Pr
       <div>
         <h2 className="text-lg font-semibold">Project Settings</h2>
         <p className="text-sm text-muted-foreground">
-          Configure .claude/settings.json fields
+          Configure project-wide behavior and permissions
         </p>
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Permissions</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Permission Rules</h3>
         <div className="space-y-2">
-          <Label>Allow (comma-separated tool patterns)</Label>
+          <Label>Always Allow (comma-separated)</Label>
           <Input
             value={form.permissionAllow}
             onChange={(e) => setForm((f) => ({ ...f, permissionAllow: e.target.value }))}
@@ -742,7 +745,7 @@ function SettingsTab({ projectId, settings }: { projectId: string; settings?: Pr
           />
         </div>
         <div className="space-y-2">
-          <Label>Deny</Label>
+          <Label>Always Deny</Label>
           <Input
             value={form.permissionDeny}
             onChange={(e) => setForm((f) => ({ ...f, permissionDeny: e.target.value }))}
@@ -752,7 +755,7 @@ function SettingsTab({ projectId, settings }: { projectId: string; settings?: Pr
           />
         </div>
         <div className="space-y-2">
-          <Label>Ask</Label>
+          <Label>Ask Before Using</Label>
           <Input
             value={form.permissionAsk}
             onChange={(e) => setForm((f) => ({ ...f, permissionAsk: e.target.value }))}
@@ -783,11 +786,11 @@ function SettingsTab({ projectId, settings }: { projectId: string; settings?: Pr
       <Separator />
 
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Sandbox</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Network Security</h3>
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Sandbox Enabled</Label>
-            <p className="text-xs text-muted-foreground">Enable network sandbox for commands</p>
+            <p className="text-xs text-muted-foreground">Restrict which websites and services commands can access</p>
           </div>
           <Switch
             checked={form.sandboxEnabled === "true"}
@@ -807,7 +810,7 @@ function SettingsTab({ projectId, settings }: { projectId: string; settings?: Pr
           />
         </div>
         <div className="space-y-2">
-          <Label>Allowed Domains (comma-separated)</Label>
+          <Label>Allowed Websites (comma-separated)</Label>
           <Input
             value={form.sandboxAllowedDomains}
             onChange={(e) => setForm((f) => ({ ...f, sandboxAllowedDomains: e.target.value }))}
@@ -819,7 +822,7 @@ function SettingsTab({ projectId, settings }: { projectId: string; settings?: Pr
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Allow Local Binding</Label>
-            <p className="text-xs text-muted-foreground">Allow binding to local ports</p>
+            <p className="text-xs text-muted-foreground">Allow local server connections</p>
           </div>
           <Switch
             checked={form.sandboxAllowLocalBinding === "true"}
@@ -828,7 +831,7 @@ function SettingsTab({ projectId, settings }: { projectId: string; settings?: Pr
           />
         </div>
         <div className="space-y-2">
-          <Label>Excluded Commands (comma-separated)</Label>
+          <Label>Commands exempt from restrictions (comma-separated)</Label>
           <Input
             value={form.sandboxExcludedCommands}
             onChange={(e) => setForm((f) => ({ ...f, sandboxExcludedCommands: e.target.value }))}
@@ -912,7 +915,7 @@ function HooksTab({ projectId, hooks }: { projectId: string; hooks: Hook[] }) {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "hooks"] });
       setShowNew(false);
       setNewHook(emptyHookForm);
-      toast({ title: "Hook created" });
+      toast({ title: "Automation created" });
     },
   });
 
@@ -935,7 +938,7 @@ function HooksTab({ projectId, hooks }: { projectId: string; hooks: Hook[] }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "hooks"] });
       setEditingHookId(null);
-      toast({ title: "Hook updated" });
+      toast({ title: "Automation updated" });
     },
   });
 
@@ -945,7 +948,7 @@ function HooksTab({ projectId, hooks }: { projectId: string; hooks: Hook[] }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "hooks"] });
-      toast({ title: "Hook deleted" });
+      toast({ title: "Automation deleted" });
     },
   });
 
@@ -978,16 +981,17 @@ function HooksTab({ projectId, hooks }: { projectId: string; hooks: Hook[] }) {
 
   return (
     <div className="space-y-4">
+      <HelpSection section="automations" />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-lg font-semibold">Hooks</h2>
+          <h2 className="text-lg font-semibold">Automations</h2>
           <p className="text-sm text-muted-foreground">
-            Event-driven automation exported to .claude/settings.json
+            Actions that run automatically when certain things happen
           </p>
         </div>
         <Button onClick={() => setShowNew(true)} data-testid="button-add-hook">
           <Plus className="h-4 w-4 mr-2" />
-          Add Hook
+          Add Automation
         </Button>
       </div>
 
@@ -1018,7 +1022,7 @@ function HooksTab({ projectId, hooks }: { projectId: string; hooks: Hook[] }) {
                 disabled={!newHook.event || createMutation.isPending}
                 data-testid="button-save-hook"
               >
-                Create Hook
+                Create Automation
               </Button>
             </div>
           </CardContent>
@@ -1062,7 +1066,7 @@ function HooksTab({ projectId, hooks }: { projectId: string; hooks: Hook[] }) {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Badge variant="default" className="text-[10px]">
-                            {HOOK_EVENTS.find((e) => e.value === hook.event)?.label ?? hook.event}
+                            {hookEventDisplayNames[hook.event] || HOOK_EVENTS.find((e) => e.value === hook.event)?.label || hook.event}
                           </Badge>
                           {hook.matcher && (
                             <Badge variant="secondary" className="text-[10px] font-mono">{hook.matcher}</Badge>
@@ -1134,7 +1138,7 @@ function HookFormFields({
                 <div key={group}>
                   <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group}</div>
                   {events.map((e) => (
-                    <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+                    <SelectItem key={e.value} value={e.value}>{hookEventDisplayNames[e.value] || e.label}</SelectItem>
                   ))}
                 </div>
               ))}

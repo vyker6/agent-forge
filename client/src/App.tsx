@@ -16,6 +16,7 @@ import ProjectEditorPage from "@/pages/project-editor";
 import DeployPage from "@/pages/deploy";
 import ImportPage from "@/pages/import";
 import TemplatesPage from "@/pages/templates";
+import AgentBuilderPage from "@/pages/agent-builder";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/import" component={ImportPage} />
       <Route path="/templates" component={TemplatesPage} />
       <Route path="/deploy" component={DeployPage} />
+      <Route path="/build" component={AgentBuilderPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { Bot, FolderOpen, Rocket, Plus, Upload, Sparkles } from "lucide-react";
+import { Bot, FolderOpen, Rocket, Plus, Upload, Sparkles, MessageSquarePlus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Agent } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
@@ -23,6 +23,10 @@ export function AppSidebar() {
 
   const { data: agents = [] } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
+  });
+
+  const { data: aiStatus } = useQuery<{ available: boolean }>({
+    queryKey: ["/api/ai/status"],
   });
 
   return (
@@ -111,6 +115,20 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {aiStatus?.available && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === "/build"}
+                    tooltip="Build with AI"
+                  >
+                    <Link href="/build" data-testid="link-build">
+                      <MessageSquarePlus className="h-4 w-4" />
+                      <span>Build with AI</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild

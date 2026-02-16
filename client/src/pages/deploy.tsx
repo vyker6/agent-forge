@@ -198,10 +198,10 @@ export default function DeployPage() {
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-deploy-title">
-          Deploy Agents
+          Download & Install
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Export your agent configuration as a .claude/ directory ready to install
+          Download your agents as ready-to-install configuration files
         </p>
       </div>
 
@@ -361,13 +361,13 @@ export default function DeployPage() {
               Select your project above and click download
             </Step>
             <Step number={2} title="Extract to project root">
-              Unzip the file into your Claude Code project's root directory
+              Unzip the file into your project's main folder
             </Step>
             <Step number={3} title="Start Claude Code">
               The agents, skills, and commands will be automatically discovered
             </Step>
             <Step number={4} title="Use your agents">
-              Invoke agents with @agent-name, run commands with /command-name
+              Use agents by typing @agent-name, run shortcuts with /command-name
             </Step>
           </div>
         </CardContent>

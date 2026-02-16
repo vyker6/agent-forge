@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Bot, Sparkles, ArrowRight, Code, Server, Terminal as TerminalIcon, FileText, Settings, Layers } from "lucide-react";
+import { Bot, Sparkles, ArrowRight, MessageSquarePlus, Layout, PenTool } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,28 +9,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { templates } from "@/data/templates";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 
 const STORAGE_KEY = "agentMaker.onboardingComplete";
 
-const PROJECT_TYPES = [
-  { id: "webapp", label: "Web App", icon: Code, categories: ["Development"] },
-  { id: "api", label: "API / Backend", icon: Server, categories: ["Development", "Security"] },
-  { id: "cli", label: "CLI Tool", icon: TerminalIcon, categories: ["Development"] },
-  { id: "devops", label: "DevOps", icon: Layers, categories: ["DevOps"] },
-  { id: "docs", label: "Documentation", icon: FileText, categories: ["Documentation"] },
-  { id: "other", label: "Other", icon: Settings, categories: ["Development", "Migration"] },
-] as const;
-
 export function OnboardingDialog() {
   const [, navigate] = useLocation();
-  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
-  const [selectedType, setSelectedType] = useState<string>("");
-  const [importing, setImporting] = useState<string | null>(null);
 
   useEffect(() => {
     const done = localStorage.getItem(STORAGE_KEY);
@@ -42,63 +27,6 @@ export function OnboardingDialog() {
   const dismiss = () => {
     localStorage.setItem(STORAGE_KEY, "true");
     setOpen(false);
-  };
-
-  const selectedProjectType = PROJECT_TYPES.find((t) => t.id === selectedType);
-  const suggestedTemplates = selectedProjectType
-    ? templates.filter((t) =>
-        (selectedProjectType.categories as readonly string[]).includes(t.category)
-      ).slice(0, 3)
-    : templates.slice(0, 3);
-
-  const handleUseTemplate = async (templateId: string) => {
-    const template = templates.find((t) => t.id === templateId);
-    if (!template) return;
-
-    setImporting(templateId);
-    try {
-      const projectRes = await apiRequest("POST", "/api/projects", {
-        name: template.name,
-        description: template.description,
-      });
-      const project = await projectRes.json();
-
-      for (const agentDef of template.agents) {
-        const { skills, commands, ...agentData } = agentDef;
-        const agentRes = await apiRequest("POST", "/api/agents", agentData);
-        const agent = await agentRes.json();
-
-        await apiRequest("POST", `/api/projects/${project.id}/agents`, {
-          agentId: agent.id,
-        });
-
-        for (const skill of skills) {
-          await apiRequest("POST", `/api/agents/${agent.id}/skills`, skill);
-        }
-        for (const cmd of commands) {
-          await apiRequest("POST", `/api/agents/${agent.id}/commands`, cmd);
-        }
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-
-      toast({
-        title: "Template imported",
-        description: `"${template.name}" project created`,
-      });
-
-      dismiss();
-      navigate(`/projects/${project.id}`);
-    } catch (err) {
-      toast({
-        title: "Import failed",
-        description: (err as Error).message,
-        variant: "destructive",
-      });
-    } finally {
-      setImporting(null);
-    }
   };
 
   return (
@@ -114,17 +42,33 @@ export function OnboardingDialog() {
               </div>
               <DialogTitle className="text-center text-xl">Welcome to Agent Maker</DialogTitle>
               <DialogDescription className="text-center">
-                Build custom agents, skills, and commands for Claude Code.
-                Export them as ready-to-use configuration files.
+                Build specialized AI assistants for Claude Code — no coding required.
               </DialogDescription>
             </DialogHeader>
+            <div className="space-y-3 mt-4">
+              <ConceptCard
+                icon={Bot}
+                title="Agents"
+                description="Specialized AI assistants, each focused on a specific task like reviewing code or writing tests."
+              />
+              <ConceptCard
+                icon={Sparkles}
+                title="Skills"
+                description="Reusable abilities you teach an agent — like 'security-scan' or 'generate-docs'."
+              />
+              <ConceptCard
+                icon={PenTool}
+                title="Commands"
+                description="Shortcuts you can type, like /review or /test, to trigger specific actions."
+              />
+            </div>
             <div className="flex flex-col gap-2 mt-4">
               <Button onClick={() => setStep(1)}>
-                Get Started
+                How do I start?
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
               <Button variant="ghost" onClick={dismiss}>
-                Skip — explore on my own
+                Skip — I'll explore on my own
               </Button>
             </div>
           </>
@@ -133,80 +77,88 @@ export function OnboardingDialog() {
         {step === 1 && (
           <>
             <DialogHeader>
-              <DialogTitle>What are you building?</DialogTitle>
+              <DialogTitle>How would you like to start?</DialogTitle>
               <DialogDescription>
-                We'll suggest templates that match your project type.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {PROJECT_TYPES.map((type) => {
-                const Icon = type.icon;
-                return (
-                  <button
-                    key={type.id}
-                    type="button"
-                    onClick={() => { setSelectedType(type.id); setStep(2); }}
-                    className={`flex items-center gap-2.5 p-3 rounded-lg border text-left text-sm transition-colors hover:bg-accent ${
-                      selectedType === type.id ? "border-primary bg-accent" : ""
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {type.label}
-                  </button>
-                );
-              })}
-            </div>
-            <Button variant="ghost" className="mt-2" onClick={dismiss}>
-              Skip
-            </Button>
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Suggested Templates</DialogTitle>
-              <DialogDescription>
-                Start with a pre-built template or create from scratch.
+                Choose the approach that fits your comfort level.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 mt-4">
-              {suggestedTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  disabled={importing === template.id}
-                  onClick={() => handleUseTemplate(template.id)}
-                  className="flex items-center gap-3 w-full p-3 rounded-lg border text-left text-sm transition-colors hover:bg-accent disabled:opacity-50"
-                >
-                  <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{template.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {template.agents.length} agent{template.agents.length !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  {importing === template.id ? (
-                    <span className="text-xs text-muted-foreground">Importing...</span>
-                  ) : (
-                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                </button>
-              ))}
+              <StartOption
+                icon={MessageSquarePlus}
+                title="Describe what you need"
+                description="Tell us in plain language and we'll generate an agent for you."
+                badge="Best for beginners"
+                onClick={() => { dismiss(); navigate("/build"); }}
+              />
+              <StartOption
+                icon={Layout}
+                title="Start from a template"
+                description="Pick a pre-built agent set and customize it."
+                onClick={() => { dismiss(); navigate("/templates"); }}
+              />
+              <StartOption
+                icon={PenTool}
+                title="Build from scratch"
+                description="Full control — configure every detail yourself."
+                onClick={() => { dismiss(); navigate("/agents/new"); }}
+              />
             </div>
-            <div className="flex flex-col gap-2 mt-4">
-              <Button variant="outline" onClick={() => { dismiss(); navigate("/agents/new"); }}>
-                Create blank project
-              </Button>
-              <Button variant="ghost" onClick={dismiss}>
-                Explore on my own
-              </Button>
-            </div>
+            <Button variant="ghost" className="mt-2 w-full" onClick={dismiss}>
+              Explore on my own
+            </Button>
           </>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ConceptCard({ icon: Icon, title, description }: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+        <Icon className="h-4 w-4 text-primary" />
+      </div>
+      <div>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function StartOption({ icon: Icon, title, description, badge, onClick }: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  badge?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-start gap-3 w-full p-3 rounded-lg border text-left text-sm transition-colors hover:bg-accent"
+    >
+      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+        <Icon className="h-4 w-4 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="font-medium">{title}</p>
+          {badge && (
+            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+              {badge}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+      </div>
+      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mt-2" />
+    </button>
   );
 }

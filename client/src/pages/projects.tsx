@@ -159,7 +159,7 @@ export default function ProjectsPage() {
             <div className="text-center">
               <h3 className="font-medium">No projects yet</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Create a project to bundle your agents together
+                A project groups your agents so you can export and install them as a set
               </p>
             </div>
           </CardContent>

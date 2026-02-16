@@ -95,6 +95,19 @@ export default function TemplatesPage() {
         </TabsList>
       </Tabs>
 
+      {filtered.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
+            <Sparkles className="h-8 w-8 text-muted-foreground" />
+            <div className="text-center">
+              <h3 className="font-medium">No templates in this category</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Try a different category or describe what you need to build one from scratch
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filtered.map((template) => (
           <Card key={template.id} data-testid={`card-template-${template.id}`}>
@@ -166,6 +179,7 @@ export default function TemplatesPage() {
           </Card>
         ))}
       </div>
+      )}
     </div>
   );
 }

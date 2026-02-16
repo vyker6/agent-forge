@@ -53,7 +53,7 @@ export default function ImportPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Import Configuration</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Import agents, skills, and settings from a .claude/ directory export
+            Import agents, skills, and settings from a configuration export
           </p>
         </div>
       </div>
@@ -243,7 +243,7 @@ function ZipImportTab() {
                   <Upload className="h-8 w-8 text-muted-foreground" />
                   <p className="text-sm font-medium">Drop a ZIP file here or click to browse</p>
                   <p className="text-xs text-muted-foreground">
-                    Accepts exported .claude/ directory ZIP files
+                    Accepts exported configuration ZIP files
                   </p>
                 </div>
               )}
@@ -264,7 +264,7 @@ function ZipImportTab() {
 
       <Card>
         <CardContent className="p-4">
-          <h4 className="text-sm font-medium mb-2">Expected ZIP Structure</h4>
+          <h4 className="text-sm font-medium mb-2">What's inside the ZIP</h4>
           <pre className="text-xs text-muted-foreground font-mono bg-muted p-3 rounded-md">
 {`.claude/
   CLAUDE.md

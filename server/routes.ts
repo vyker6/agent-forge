@@ -9,8 +9,23 @@ import {
   insertFileMapEntrySchema, insertProjectSchema, insertProjectAgentSchema,
   insertRuleSchema, insertProjectSettingsSchema, insertHookSchema, insertMcpServerSchema
 } from "@shared/schema";
+import { isAiAvailable, generateAgentConfig } from "./ai-generate";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+const rateLimiter = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimiter.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimiter.set(ip, { count: 1, resetAt: now + 60000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count++;
+  return true;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -571,6 +586,33 @@ export async function registerRoutes(
     }
 
     await archive.finalize();
+  });
+
+  // AI generation endpoints
+  app.get("/api/ai/status", (_req, res) => {
+    res.json({ available: isAiAvailable() });
+  });
+
+  app.post("/api/agents/generate", async (req, res) => {
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    if (!checkRateLimit(ip)) {
+      return res.status(429).json({
+        error: "Too many requests. Please wait a minute before trying again.",
+      });
+    }
+
+    const { description, refinement, previousConfig } = req.body;
+    if (!description || typeof description !== "string") {
+      return res.status(400).json({ error: "Description is required" });
+    }
+
+    try {
+      const result = await generateAgentConfig(description, refinement, previousConfig);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Generation failed";
+      res.status(422).json({ error: message });
+    }
   });
 
   return httpServer;

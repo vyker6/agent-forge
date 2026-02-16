@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Plus, MoreVertical, Trash2, Copy } from "lucide-react";
 import type { Agent } from "@shared/schema";
-import { AVAILABLE_MODELS } from "@shared/schema";
+import { AVAILABLE_MODELS, MEMORY_SCOPES } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,7 +69,7 @@ export default function AgentsPage() {
             Agents
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Design and configure local agents for Claude Code
+            Your AI assistants — each one specialized for a different task
           </p>
         </div>
         <Button asChild data-testid="button-create-agent">
@@ -89,7 +89,7 @@ export default function AgentsPage() {
             <div className="text-center">
               <h3 className="font-medium">No agents yet</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Create your first agent to get started
+                Describe what you need and we'll help you build your first agent
               </p>
             </div>
             <Button asChild variant="outline" data-testid="button-create-first-agent">
@@ -165,7 +165,7 @@ export default function AgentsPage() {
                       </Badge>
                     )}
                     <Badge variant="outline" className="text-[10px]">
-                      {agent.memoryScope}
+                      {MEMORY_SCOPES.find((s) => s.value === agent.memoryScope)?.label ?? agent.memoryScope}
                     </Badge>
                   </div>
                 </CardContent>
