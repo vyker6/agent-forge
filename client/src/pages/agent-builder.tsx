@@ -106,14 +106,27 @@ export default function AgentBuilderPage() {
       });
       const agent = await agentRes.json();
 
-      // Create skills
+      // Create skills — coerce AI booleans to strings and strip extra fields
       for (const skill of config.skills) {
-        await apiRequest("POST", `/api/agents/${agent.id}/skills`, skill);
+        await apiRequest("POST", `/api/agents/${agent.id}/skills`, {
+          name: skill.name,
+          description: skill.description,
+          instructions: skill.instructions,
+          context: skill.context,
+          allowedTools: skill.allowedTools,
+          userInvocable: String(skill.userInvocable ?? "true"),
+        });
       }
 
-      // Create commands
+      // Create commands — strip extra fields to match schema
       for (const cmd of config.commands) {
-        await apiRequest("POST", `/api/agents/${agent.id}/commands`, cmd);
+        await apiRequest("POST", `/api/agents/${agent.id}/commands`, {
+          name: cmd.name,
+          description: cmd.description,
+          promptTemplate: cmd.promptTemplate,
+          context: cmd.context,
+          allowedTools: cmd.allowedTools,
+        });
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
