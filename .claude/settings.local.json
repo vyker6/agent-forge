@@ -1,7 +1,33 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(node -e:*)",
+      "Bash(npx tsc:*)",
+      "WebSearch",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm run db:push:*)",
+      "Bash(npx vite build:*)",
+      "Bash(git log:*)",
+      "Bash(git stash:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(lsof:*)",
+      "Bash(unzip:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh:*)",
+      "Bash(apt-get update:*)",
+      "Bash(apt list:*)",
+      "Bash(export PATH=\"/home/runner/.local/bin:$PATH\")",
+      "Bash(git push:*)",
+      "Bash(chmod:*)",
+      "Bash(find:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(fuser:*)"
     ]
   }
 }
