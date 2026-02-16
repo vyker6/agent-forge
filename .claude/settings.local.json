@@ -30,7 +30,18 @@
       "Bash(fuser:*)",
       "Bash(tar xz:*)",
       "Bash(/tmp/gh_2.67.0_linux_amd64/bin/gh:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(/home/runner/.local/bin/gh auth status:*)",
+      "Bash(/home/runner/.local/bin/gh pr create:*)",
+      "Bash(/home/runner/.local/bin/gh pr view 2 --json title,body,state)",
+      "Bash(/home/runner/.local/bin/gh pr edit:*)",
+      "Bash(/home/runner/.local/bin/gh api:*)",
+      "Bash(/home/runner/.local/bin/gh pr view:*)",
+      "Bash(/home/runner/.local/bin/gh pr merge 2 --merge --delete-branch)",
+      "Bash(bun add:*)",
+      "Bash(bun run check:*)",
+      "Bash(bun run test:*)",
+      "Bash(pkill:*)"
     ]
   }
 }
