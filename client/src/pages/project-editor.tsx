@@ -3,14 +3,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import {
   ArrowLeft, Save, FileText, ScrollText, Settings, Webhook,
-  Plus, Trash2, FolderOpen, Bot, X
+  Plus, Trash2, FolderOpen, Bot, X, Server
 } from "lucide-react";
 import type {
-  Project, Agent, ProjectAgent, Rule, ProjectSettings, Hook,
-  InsertProject, InsertRule, InsertProjectSettings, InsertHook
+  Project, Agent, ProjectAgent, Rule, ProjectSettings, Hook, McpServer,
+  InsertProject, InsertRule, InsertProjectSettings, InsertHook, InsertMcpServer
 } from "@shared/schema";
 import {
-  HOOK_EVENTS, HOOK_HANDLER_TYPES, AVAILABLE_MODELS
+  HOOK_EVENTS, HOOK_HANDLER_TYPES, AVAILABLE_MODELS, MCP_SERVER_TEMPLATES
 } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,13 @@ export default function ProjectEditorPage() {
     name: "",
     description: "",
     claudeMdContent: "",
+    pluginVersion: "",
+    pluginAuthorName: "",
+    pluginAuthorEmail: "",
+    pluginHomepage: "",
+    pluginRepository: "",
+    pluginLicense: "MIT",
+    pluginKeywords: [],
   });
 
   const { data: project, isLoading } = useQuery<Project>({
@@ -76,12 +83,24 @@ export default function ProjectEditorPage() {
     enabled: !!projectId,
   });
 
+  const { data: projectMcpServers = [] } = useQuery<McpServer[]>({
+    queryKey: ["/api/projects", projectId, "mcp-servers"],
+    enabled: !!projectId,
+  });
+
   useEffect(() => {
     if (project) {
       setForm({
         name: project.name,
         description: project.description,
         claudeMdContent: project.claudeMdContent,
+        pluginVersion: project.pluginVersion,
+        pluginAuthorName: project.pluginAuthorName,
+        pluginAuthorEmail: project.pluginAuthorEmail,
+        pluginHomepage: project.pluginHomepage,
+        pluginRepository: project.pluginRepository,
+        pluginLicense: project.pluginLicense,
+        pluginKeywords: project.pluginKeywords,
       });
     }
   }, [project]);
@@ -192,6 +211,17 @@ export default function ProjectEditorPage() {
                   <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">{projectHooks.length}</Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger
+                value="mcp-servers"
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-3 py-2"
+                data-testid="tab-mcp-servers"
+              >
+                <Server className="h-4 w-4 mr-1.5" />
+                MCP Servers
+                {projectMcpServers.length > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">{projectMcpServers.length}</Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -213,6 +243,9 @@ export default function ProjectEditorPage() {
             </TabsContent>
             <TabsContent value="hooks" className="p-6 mt-0 max-w-3xl">
               <HooksTab projectId={projectId!} hooks={projectHooks} />
+            </TabsContent>
+            <TabsContent value="mcp-servers" className="p-6 mt-0 max-w-3xl">
+              <McpServersTab projectId={projectId!} servers={projectMcpServers} />
             </TabsContent>
           </ScrollArea>
         </Tabs>
@@ -325,6 +358,86 @@ function OverviewTab({
               );
             })
           )}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <div>
+          <Label className="text-base font-semibold">Plugin Metadata</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Optional fields for JSON plugin export
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Version</Label>
+            <Input
+              value={(form as Record<string, unknown>).pluginVersion as string ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, pluginVersion: e.target.value }))}
+              placeholder="1.0.0"
+              data-testid="input-plugin-version"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>License</Label>
+            <Input
+              value={(form as Record<string, unknown>).pluginLicense as string ?? "MIT"}
+              onChange={(e) => setForm((f) => ({ ...f, pluginLicense: e.target.value }))}
+              placeholder="MIT"
+              data-testid="input-plugin-license"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Author Name</Label>
+            <Input
+              value={(form as Record<string, unknown>).pluginAuthorName as string ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, pluginAuthorName: e.target.value }))}
+              placeholder="Your Name"
+              data-testid="input-plugin-author-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Author Email</Label>
+            <Input
+              value={(form as Record<string, unknown>).pluginAuthorEmail as string ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, pluginAuthorEmail: e.target.value }))}
+              placeholder="you@example.com"
+              data-testid="input-plugin-author-email"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Homepage URL</Label>
+            <Input
+              value={(form as Record<string, unknown>).pluginHomepage as string ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, pluginHomepage: e.target.value }))}
+              placeholder="https://example.com"
+              data-testid="input-plugin-homepage"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Repository URL</Label>
+            <Input
+              value={(form as Record<string, unknown>).pluginRepository as string ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, pluginRepository: e.target.value }))}
+              placeholder="https://github.com/user/repo"
+              data-testid="input-plugin-repository"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Keywords (comma-separated)</Label>
+          <Input
+            value={((form as Record<string, unknown>).pluginKeywords as string[] ?? []).join(", ")}
+            onChange={(e) => setForm((f) => ({ ...f, pluginKeywords: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) }))}
+            placeholder="claude, agents, automation"
+            data-testid="input-plugin-keywords"
+          />
         </div>
       </div>
     </div>
@@ -1126,6 +1239,277 @@ function HookFormFields({
             data-testid="switch-hook-once"
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function McpServersTab({ projectId, servers }: { projectId: string; servers: McpServer[] }) {
+  const { toast } = useToast();
+  const [showNew, setShowNew] = useState(false);
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
+
+  const emptyServerForm = {
+    name: "",
+    command: "",
+    args: "",
+    env: "{}",
+    cwd: "",
+  };
+
+  const [newServer, setNewServer] = useState(emptyServerForm);
+  const [editForm, setEditForm] = useState(emptyServerForm);
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof newServer) => {
+      let envObj = {};
+      try { envObj = JSON.parse(data.env || "{}"); } catch { /* keep empty */ }
+      const res = await apiRequest("POST", `/api/projects/${projectId}/mcp-servers`, {
+        name: data.name,
+        command: data.command,
+        args: data.args.split(",").map((s) => s.trim()).filter(Boolean),
+        env: envObj,
+        cwd: data.cwd,
+        sortOrder: servers.length,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "mcp-servers"] });
+      setShowNew(false);
+      setNewServer(emptyServerForm);
+      toast({ title: "MCP server created" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof editForm & { id: string }) => {
+      const { id, ...rest } = data;
+      let envObj = {};
+      try { envObj = JSON.parse(rest.env || "{}"); } catch { /* keep empty */ }
+      const res = await apiRequest("PATCH", `/api/mcp-servers/${id}`, {
+        name: rest.name,
+        command: rest.command,
+        args: rest.args.split(",").map((s) => s.trim()).filter(Boolean),
+        env: envObj,
+        cwd: rest.cwd,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "mcp-servers"] });
+      setEditingServerId(null);
+      toast({ title: "MCP server updated" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/mcp-servers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "mcp-servers"] });
+      toast({ title: "MCP server deleted" });
+    },
+  });
+
+  const startEditing = (server: McpServer) => {
+    setEditingServerId(server.id);
+    setEditForm({
+      name: server.name,
+      command: server.command,
+      args: server.args.join(", "),
+      env: JSON.stringify(server.env, null, 2),
+      cwd: server.cwd,
+    });
+  };
+
+  const applyTemplate = (template: typeof MCP_SERVER_TEMPLATES[number]) => {
+    setNewServer({
+      name: template.name,
+      command: template.command,
+      args: [...template.args].join(", "),
+      env: JSON.stringify(template.env, null, 2),
+      cwd: "",
+    });
+    setShowNew(true);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">MCP Servers</h2>
+          <p className="text-sm text-muted-foreground">
+            Model Context Protocol servers exported to .mcp.json
+          </p>
+        </div>
+        <Button onClick={() => setShowNew(true)} data-testid="button-add-mcp-server">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Server
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {MCP_SERVER_TEMPLATES.map((t) => (
+          <Button
+            key={t.name}
+            variant="outline"
+            size="sm"
+            onClick={() => applyTemplate(t)}
+            data-testid={`button-template-${t.name}`}
+          >
+            {t.label}
+          </Button>
+        ))}
+      </div>
+
+      {showNew && (
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <McpServerFormFields form={newServer} setForm={setNewServer} />
+            <div className="flex items-center gap-2 justify-end">
+              <Button variant="ghost" onClick={() => { setShowNew(false); setNewServer(emptyServerForm); }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createMutation.mutate(newServer)}
+                disabled={!newServer.name.trim() || !newServer.command.trim() || createMutation.isPending}
+                data-testid="button-save-mcp-server"
+              >
+                Create Server
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {servers.length === 0 && !showNew ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
+            <Server className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No MCP servers added yet</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {servers.map((server) => (
+            <Card key={server.id} data-testid={`card-mcp-server-${server.id}`}>
+              <CardContent className="p-4">
+                {editingServerId === server.id ? (
+                  <div className="space-y-4">
+                    <McpServerFormFields form={editForm} setForm={setEditForm} />
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button variant="ghost" onClick={() => setEditingServerId(null)}>Cancel</Button>
+                      <Button
+                        onClick={() => updateMutation.mutate({ ...editForm, id: server.id })}
+                        disabled={!editForm.name.trim() || !editForm.command.trim() || updateMutation.isPending}
+                      >
+                        {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                      onClick={() => startEditing(server)}
+                    >
+                      <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
+                        <Server className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-medium text-sm">{server.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate">
+                          {server.command} {server.args.join(" ")}
+                        </p>
+                        {Object.keys((server.env as Record<string, unknown>) || {}).length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {Object.keys(server.env as Record<string, unknown>).map((key) => (
+                              <Badge key={key} variant="secondary" className="text-[10px] font-mono">{key}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(server.id); }}
+                      data-testid={`button-delete-mcp-server-${server.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function McpServerFormFields({
+  form,
+  setForm,
+}: {
+  form: { name: string; command: string; args: string; env: string; cwd: string };
+  setForm: React.Dispatch<React.SetStateAction<typeof form>>;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Server Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="e.g. github"
+            data-testid="input-mcp-server-name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Command</Label>
+          <Input
+            value={form.command}
+            onChange={(e) => setForm((f) => ({ ...f, command: e.target.value }))}
+            placeholder="e.g. npx"
+            className="font-mono text-sm"
+            data-testid="input-mcp-server-command"
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Arguments (comma-separated)</Label>
+        <Input
+          value={form.args}
+          onChange={(e) => setForm((f) => ({ ...f, args: e.target.value }))}
+          placeholder="-y, @modelcontextprotocol/server-github"
+          className="font-mono text-sm"
+          data-testid="input-mcp-server-args"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Environment Variables (JSON)</Label>
+        <Textarea
+          value={form.env}
+          onChange={(e) => setForm((f) => ({ ...f, env: e.target.value }))}
+          placeholder='{"API_KEY": "your-key"}'
+          className="min-h-[80px] font-mono text-sm"
+          data-testid="textarea-mcp-server-env"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Working Directory (optional)</Label>
+        <Input
+          value={form.cwd}
+          onChange={(e) => setForm((f) => ({ ...f, cwd: e.target.value }))}
+          placeholder="/path/to/directory"
+          className="font-mono text-sm"
+          data-testid="input-mcp-server-cwd"
+        />
       </div>
     </div>
   );

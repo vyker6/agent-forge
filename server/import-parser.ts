@@ -1,6 +1,6 @@
 import matter from "gray-matter";
 import { storage } from "./storage";
-import type { InsertAgent, InsertSkill, InsertCommand, InsertRule } from "@shared/schema";
+import type { InsertAgent, InsertSkill, InsertCommand, InsertRule, InsertMcpServer } from "@shared/schema";
 import * as fs from "fs";
 import * as path from "path";
 import { createRequire } from "module";
@@ -21,6 +21,7 @@ interface ImportResult {
   rules: { name: string }[];
   settings: boolean;
   hooks: number;
+  mcpServers: number;
   warnings: string[];
 }
 
@@ -109,6 +110,7 @@ export async function importFiles(
         permissionMode: (fm.permissionMode as string) || "default",
         maxTurns: fm.maxTurns != null ? Number(fm.maxTurns) : null,
         preloadedSkills: Array.isArray(fm.skills) ? fm.skills.map(String) : [],
+        mcpServers: Array.isArray(fm.mcpServers) ? fm.mcpServers.map(String) : [],
         icon: "bot",
         color: "#3b82f6",
       };
@@ -333,6 +335,37 @@ export async function importFiles(
     }
   }
 
+  // Parse .mcp.json
+  let mcpServersImported = 0;
+
+  const mcpFile = files.find((f) => {
+    const rel = getRelativePath(f.path, prefix);
+    return rel === ".mcp.json";
+  });
+
+  if (mcpFile) {
+    try {
+      const json = JSON.parse(mcpFile.content);
+      const servers = json.mcpServers || json;
+      let sortOrder = 0;
+      for (const [name, config] of Object.entries(servers as Record<string, Record<string, unknown>>)) {
+        if (typeof config !== "object" || !config.command) continue;
+        await storage.createMcpServer({
+          projectId: project.id,
+          name,
+          command: config.command as string,
+          args: Array.isArray(config.args) ? config.args.map(String) : [],
+          env: (typeof config.env === "object" && config.env !== null ? config.env : {}) as Record<string, unknown>,
+          cwd: (config.cwd as string) || "",
+          sortOrder: sortOrder++,
+        });
+        mcpServersImported++;
+      }
+    } catch (e) {
+      warnings.push(`Failed to parse .mcp.json — ${(e as Error).message}`);
+    }
+  }
+
   return {
     project: { id: project.id, name: project.name },
     agents: createdAgents,
@@ -341,6 +374,7 @@ export async function importFiles(
     rules: createdRules,
     settings: settingsImported,
     hooks: hooksImported,
+    mcpServers: mcpServersImported,
     warnings,
   };
 }
@@ -369,6 +403,7 @@ export async function parseMarkdownContent(
           permissionMode: (fm.permissionMode as string) || "default",
           maxTurns: fm.maxTurns != null ? Number(fm.maxTurns) : null,
           preloadedSkills: Array.isArray(fm.skills) ? fm.skills.map(String) : [],
+          mcpServers: Array.isArray(fm.mcpServers) ? fm.mcpServers.map(String) : [],
           icon: "bot",
           color: "#3b82f6",
         });

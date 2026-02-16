@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Rocket, Download, FolderOpen, Bot, CheckCircle2,
   FileText, Puzzle, Terminal as TerminalIcon, FolderTree,
-  ChevronDown, ChevronRight, AlertCircle
+  ChevronDown, ChevronRight, AlertCircle, Package, Copy, Server
 } from "lucide-react";
-import type { Agent, Project, ProjectAgent, Skill, Command, FileMapEntry } from "@shared/schema";
+import type { Agent, Project, ProjectAgent, McpServer } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,9 +45,16 @@ export default function DeployPage() {
     enabled: !!selectedProjectId,
   });
 
+  const { data: mcpServers = [] } = useQuery<McpServer[]>({
+    queryKey: ["/api/projects", selectedProjectId, "mcp-servers"],
+    enabled: !!selectedProjectId,
+  });
+
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const assignedAgentIds = projectAgents.map((pa) => pa.agentId);
   const assignedAgents = agents.filter((a) => assignedAgentIds.includes(a.id));
+
+  const [isExportingPlugin, setIsExportingPlugin] = useState(false);
 
   const handleDeploy = async () => {
     if (!selectedProjectId) return;
@@ -78,6 +85,39 @@ export default function DeployPage() {
       });
     } finally {
       setIsDeploying(false);
+    }
+  };
+
+  const handlePluginExport = async () => {
+    if (!selectedProjectId) return;
+    setIsExportingPlugin(true);
+    try {
+      const response = await fetch(`/api/projects/${selectedProjectId}/export?format=json`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Export failed");
+      const json = await response.json();
+      const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${selectedProject?.name || "project"}-plugin.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Plugin exported",
+        description: "JSON plugin file downloaded",
+      });
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: "Could not generate the plugin file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingPlugin(false);
     }
   };
 
@@ -175,24 +215,56 @@ export default function DeployPage() {
                     <FilePreview
                       project={selectedProject}
                       agents={assignedAgents}
+                      mcpServerCount={mcpServers.length}
                     />
                   </CollapsibleContent>
                 </Collapsible>
               )}
 
-              <Button
-                className="w-full"
-                disabled={assignedAgents.length === 0 || isDeploying}
-                onClick={handleDeploy}
-                data-testid="button-deploy"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {isDeploying ? "Generating..." : "Download .claude/ Configuration"}
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  className="flex-1"
+                  disabled={assignedAgents.length === 0 || isDeploying}
+                  onClick={handleDeploy}
+                  data-testid="button-deploy"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {isDeploying ? "Generating..." : "Download ZIP"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={assignedAgents.length === 0 || isExportingPlugin}
+                  onClick={handlePluginExport}
+                  data-testid="button-export-plugin"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  {isExportingPlugin ? "Exporting..." : "Export as Plugin"}
+                </Button>
+              </div>
             </>
           )}
         </CardContent>
       </Card>
+
+      {selectedProject && selectedProjectId && (
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-md bg-accent flex items-center justify-center shrink-0">
+                <TerminalIcon className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold">CLI Install Command</h3>
+                <p className="text-sm text-muted-foreground">
+                  Install this plugin directly via the command line
+                </p>
+              </div>
+            </div>
+            <CliCommand projectId={selectedProjectId} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-6 space-y-4">
@@ -231,12 +303,15 @@ function Step({ number, title, children }: { number: number; title: string; chil
   );
 }
 
-function FilePreview({ project, agents }: { project: Project; agents: Agent[] }) {
+function FilePreview({ project, agents, mcpServerCount = 0 }: { project: Project; agents: Agent[]; mcpServerCount?: number }) {
   return (
     <Card className="mt-2">
       <CardContent className="p-0">
         <ScrollArea className="max-h-64">
           <div className="p-3 space-y-1 font-mono text-xs">
+            {mcpServerCount > 0 && (
+              <TreeLine depth={0} icon={<Server className="h-3 w-3" />} label=".mcp.json" />
+            )}
             <TreeLine depth={0} icon={<FolderOpen className="h-3 w-3" />} label=".claude/" />
             {project.claudeMdContent && (
               <TreeLine depth={1} icon={<FileText className="h-3 w-3" />} label="CLAUDE.md" />
@@ -256,6 +331,27 @@ function FilePreview({ project, agents }: { project: Project; agents: Agent[] })
         </ScrollArea>
       </CardContent>
     </Card>
+  );
+}
+
+function CliCommand({ projectId }: { projectId: string }) {
+  const { toast } = useToast();
+  const command = `npx agent-maker install ${window.location.origin}/api/projects/${projectId}/export?format=json`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(command);
+    toast({ title: "Copied to clipboard" });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <code className="flex-1 bg-muted p-3 rounded-md text-xs font-mono overflow-auto">
+        {command}
+      </code>
+      <Button variant="outline" size="icon" onClick={handleCopy} data-testid="button-copy-cli">
+        <Copy className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }
 

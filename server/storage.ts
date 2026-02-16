@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import {
   agents, skills, commands, fileMapEntries, projects, projectAgents,
-  rules, projectSettings, hooks,
+  rules, projectSettings, hooks, mcpServers,
   type Agent, type InsertAgent,
   type Skill, type InsertSkill,
   type Command, type InsertCommand,
@@ -13,6 +13,7 @@ import {
   type Rule, type InsertRule,
   type ProjectSettings, type InsertProjectSettings,
   type Hook, type InsertHook,
+  type McpServer, type InsertMcpServer,
 } from "@shared/schema";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -63,6 +64,11 @@ export interface IStorage {
   createHook(data: InsertHook): Promise<Hook>;
   updateHook(id: string, data: Partial<InsertHook>): Promise<Hook | undefined>;
   deleteHook(id: string): Promise<void>;
+
+  getMcpServers(projectId: string): Promise<McpServer[]>;
+  createMcpServer(data: InsertMcpServer): Promise<McpServer>;
+  updateMcpServer(id: string, data: Partial<InsertMcpServer>): Promise<McpServer | undefined>;
+  deleteMcpServer(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -235,6 +241,24 @@ export class DatabaseStorage implements IStorage {
 
   async deleteHook(id: string): Promise<void> {
     await db.delete(hooks).where(eq(hooks.id, id));
+  }
+
+  async getMcpServers(projectId: string): Promise<McpServer[]> {
+    return db.select().from(mcpServers).where(eq(mcpServers.projectId, projectId)).orderBy(mcpServers.sortOrder);
+  }
+
+  async createMcpServer(data: InsertMcpServer): Promise<McpServer> {
+    const [server] = await db.insert(mcpServers).values(data).returning();
+    return server;
+  }
+
+  async updateMcpServer(id: string, data: Partial<InsertMcpServer>): Promise<McpServer | undefined> {
+    const [server] = await db.update(mcpServers).set(data).where(eq(mcpServers.id, id)).returning();
+    return server;
+  }
+
+  async deleteMcpServer(id: string): Promise<void> {
+    await db.delete(mcpServers).where(eq(mcpServers.id, id));
   }
 }
 

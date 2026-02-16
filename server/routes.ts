@@ -7,7 +7,7 @@ import { parseZipBuffer, importFiles, parseMarkdownContent } from "./import-pars
 import {
   insertAgentSchema, insertSkillSchema, insertCommandSchema,
   insertFileMapEntrySchema, insertProjectSchema, insertProjectAgentSchema,
-  insertRuleSchema, insertProjectSettingsSchema, insertHookSchema
+  insertRuleSchema, insertProjectSettingsSchema, insertHookSchema, insertMcpServerSchema
 } from "@shared/schema";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -263,6 +263,33 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  // MCP Servers
+  app.get("/api/projects/:id/mcp-servers", async (req, res) => {
+    const items = await storage.getMcpServers(req.params.id);
+    res.json(items);
+  });
+
+  app.post("/api/projects/:id/mcp-servers", async (req, res) => {
+    const data = { ...req.body, projectId: req.params.id };
+    const parsed = insertMcpServerSchema.safeParse(data);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const server = await storage.createMcpServer(parsed.data);
+    res.status(201).json(server);
+  });
+
+  app.patch("/api/mcp-servers/:id", async (req, res) => {
+    const parsed = insertMcpServerSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const server = await storage.updateMcpServer(req.params.id, parsed.data);
+    if (!server) return res.status(404).json({ error: "MCP server not found" });
+    res.json(server);
+  });
+
+  app.delete("/api/mcp-servers/:id", async (req, res) => {
+    await storage.deleteMcpServer(req.params.id);
+    res.status(204).end();
+  });
+
   app.get("/api/projects/:id/export", async (req, res) => {
     const project = await storage.getProject(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
@@ -283,6 +310,58 @@ export async function registerRoutes(
     const projectRules = await storage.getRules(project.id);
     const projectSettings = await storage.getProjectSettings(project.id);
     const projectHooks = await storage.getHooks(project.id);
+    const mcpServerList = await storage.getMcpServers(project.id);
+
+    // JSON format for plugin export
+    if (req.query.format === "json") {
+      const jsonExport = {
+        name: project.name,
+        description: project.description,
+        version: project.pluginVersion || "1.0.0",
+        author: project.pluginAuthorName ? {
+          name: project.pluginAuthorName,
+          email: project.pluginAuthorEmail || undefined,
+        } : undefined,
+        homepage: project.pluginHomepage || undefined,
+        repository: project.pluginRepository || undefined,
+        license: project.pluginLicense || "MIT",
+        keywords: project.pluginKeywords.length > 0 ? project.pluginKeywords : undefined,
+        claudeMd: project.claudeMdContent || undefined,
+        agents: agentList.map(({ agent, skills: s, commands: c }) => ({
+          name: agent.name,
+          description: agent.description,
+          model: agent.model,
+          tools: agent.tools,
+          systemPrompt: agent.systemPrompt,
+          skills: s.map((sk) => ({ name: sk.name, description: sk.description })),
+          commands: c.map((cm) => ({ name: cm.name, description: cm.description })),
+        })),
+        rules: projectRules.map((r) => ({ name: r.name, paths: r.paths, content: r.content })),
+        settings: projectSettings ? {
+          permissions: {
+            allow: projectSettings.permissionAllow,
+            deny: projectSettings.permissionDeny,
+            ask: projectSettings.permissionAsk,
+          },
+          defaultModel: projectSettings.defaultModel || undefined,
+        } : undefined,
+        hooks: projectHooks.length > 0 ? projectHooks.map((h) => ({
+          event: h.event,
+          matcher: h.matcher,
+          handlerType: h.handlerType,
+          command: h.command || undefined,
+          prompt: h.prompt || undefined,
+        })) : undefined,
+        mcpServers: mcpServerList.length > 0 ? mcpServerList.map((s) => ({
+          name: s.name,
+          command: s.command,
+          args: s.args,
+          env: s.env,
+          cwd: s.cwd || undefined,
+        })) : undefined,
+      };
+      return res.json(jsonExport);
+    }
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${project.name}-claude-config.zip"`);
@@ -406,6 +485,12 @@ export async function registerRoutes(
           agentMd += `  - ${s}\n`;
         }
       }
+      if (agent.mcpServers.length > 0) {
+        agentMd += `mcpServers:\n`;
+        for (const s of agent.mcpServers) {
+          agentMd += `  - ${s}\n`;
+        }
+      }
       agentMd += "---\n\n";
       agentMd += agent.systemPrompt;
       archive.append(agentMd, { name: `.claude/agents/${slug}.md` });
@@ -469,6 +554,20 @@ export async function registerRoutes(
         cmdMd += cmd.promptTemplate;
         archive.append(cmdMd, { name: `.claude/commands/${cmd.name}.md` });
       }
+    }
+
+    // Export .mcp.json at root level
+    if (mcpServerList.length > 0) {
+      const mcpJson: Record<string, { command: string; args: string[]; env: Record<string, string>; cwd?: string }> = {};
+      for (const s of mcpServerList) {
+        mcpJson[s.name] = {
+          command: s.command,
+          args: s.args,
+          env: (s.env as Record<string, string>) || {},
+        };
+        if (s.cwd) mcpJson[s.name].cwd = s.cwd;
+      }
+      archive.append(JSON.stringify({ mcpServers: mcpJson }, null, 2), { name: ".mcp.json" });
     }
 
     await archive.finalize();

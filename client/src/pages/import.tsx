@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Upload, FileArchive, FileText, ArrowLeft, CheckCircle2,
-  AlertTriangle, Bot, Zap, Terminal, ScrollText, Settings, Webhook,
+  AlertTriangle, Bot, Zap, Terminal, ScrollText, Settings, Webhook, Server,
 } from "lucide-react";
 import type { Agent, Project } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ interface ImportResult {
   rules: { name: string }[];
   settings: boolean;
   hooks: number;
+  mcpServers: number;
   warnings: string[];
 }
 
@@ -160,6 +161,7 @@ function ZipImportTab() {
               <ResultStat icon={ScrollText} label="Rules" count={result.rules.length} />
               <ResultStat icon={Settings} label="Settings" count={result.settings ? 1 : 0} />
               <ResultStat icon={Webhook} label="Hooks" count={result.hooks} />
+              <ResultStat icon={Server} label="MCP Servers" count={result.mcpServers} />
             </div>
 
             {result.warnings.length > 0 && (

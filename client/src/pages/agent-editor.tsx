@@ -5,7 +5,7 @@ import {
   ArrowLeft, Save, FileText, Puzzle, Terminal as TerminalIcon,
   FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File
 } from "lucide-react";
-import type { Agent, Skill, Command, FileMapEntry, InsertAgent } from "@shared/schema";
+import type { Agent, Skill, Command, FileMapEntry, InsertAgent, McpServer, ProjectAgent } from "@shared/schema";
 import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES, PERMISSION_MODES } from "@shared/schema";
 import { AgentIcon, AgentIconPicker } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,7 @@ export default function AgentEditorPage() {
     permissionMode: "default",
     maxTurns: null,
     preloadedSkills: [],
+    mcpServers: [],
     icon: "bot",
     color: "#3b82f6",
   });
@@ -79,6 +80,30 @@ export default function AgentEditorPage() {
     enabled: !!agentId,
   });
 
+  // Find the project this agent belongs to, then fetch its MCP servers
+  const { data: allProjectAgents = [] } = useQuery<(ProjectAgent & { projectId: string })[]>({
+    queryKey: ["/api/project-agents-for-agent", agentId],
+    queryFn: async () => {
+      const projectsRes = await fetch("/api/projects");
+      const projects = await projectsRes.json();
+      for (const p of projects) {
+        const pasRes = await fetch(`/api/projects/${p.id}/agents`);
+        const pas = await pasRes.json();
+        const match = pas.find((pa: ProjectAgent) => pa.agentId === agentId);
+        if (match) return [match];
+      }
+      return [];
+    },
+    enabled: !!agentId,
+  });
+
+  const projectId = allProjectAgents.length > 0 ? allProjectAgents[0].projectId : null;
+
+  const { data: projectMcpServers = [] } = useQuery<McpServer[]>({
+    queryKey: ["/api/projects", projectId, "mcp-servers"],
+    enabled: !!projectId,
+  });
+
   useEffect(() => {
     if (agent) {
       setForm({
@@ -92,6 +117,7 @@ export default function AgentEditorPage() {
         permissionMode: agent.permissionMode,
         maxTurns: agent.maxTurns,
         preloadedSkills: agent.preloadedSkills,
+        mcpServers: agent.mcpServers,
         icon: agent.icon,
         color: agent.color,
       });
@@ -238,6 +264,7 @@ export default function AgentEditorPage() {
                 toggleTool={toggleTool}
                 toggleDisallowedTool={toggleDisallowedTool}
                 skills={skills}
+                projectMcpServers={projectMcpServers}
               />
             </TabsContent>
 
@@ -267,12 +294,14 @@ function AgentConfigForm({
   toggleTool,
   toggleDisallowedTool,
   skills,
+  projectMcpServers,
 }: {
   form: InsertAgent;
   setForm: React.Dispatch<React.SetStateAction<InsertAgent>>;
   toggleTool: (tool: string) => void;
   toggleDisallowedTool: (tool: string) => void;
   skills: Skill[];
+  projectMcpServers: McpServer[];
 }) {
   return (
     <div className="space-y-6">
@@ -505,6 +534,42 @@ function AgentConfigForm({
                     />
                     <span className="text-sm">{skill.name}</span>
                     <span className="text-xs text-muted-foreground">({slug})</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {projectMcpServers.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div>
+              <Label>MCP Servers</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                MCP servers this agent has access to
+              </p>
+            </div>
+            <div className="space-y-2">
+              {projectMcpServers.map((server) => {
+                const checked = (form.mcpServers ?? []).includes(server.name);
+                return (
+                  <label key={server.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(val) => {
+                        setForm((f) => ({
+                          ...f,
+                          mcpServers: val
+                            ? [...(f.mcpServers ?? []), server.name]
+                            : (f.mcpServers ?? []).filter((s: string) => s !== server.name),
+                        }));
+                      }}
+                    />
+                    <span className="text-sm">{server.name}</span>
+                    <span className="text-xs text-muted-foreground">({server.command})</span>
                   </label>
                 );
               })}
