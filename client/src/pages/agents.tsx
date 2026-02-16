@@ -117,7 +117,7 @@ export default function AgentsPage() {
           </p>
         </div>
         <Button asChild data-testid="button-create-agent">
-          <Link href="/agents/new">
+          <Link href="/build">
             <Plus className="h-4 w-4 mr-2" />
             New Agent
           </Link>
