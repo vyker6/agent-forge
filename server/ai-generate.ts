@@ -6,8 +6,39 @@ const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
+let keyValid = false;
+
+async function validateKey(): Promise<boolean> {
+  if (!client) return false;
+  try {
+    await client.messages.create({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    return true;
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status;
+    if (status === 401 || status === 403) {
+      console.warn(`[ai] API key validation failed (${status}) — AI features disabled`);
+      return false;
+    }
+    // Other errors (network, rate limit) — assume key is valid
+    return true;
+  }
+}
+
+export async function initAi(): Promise<void> {
+  if (!client) {
+    console.log("[ai] No ANTHROPIC_API_KEY set — AI features disabled");
+    return;
+  }
+  keyValid = await validateKey();
+  console.log(`[ai] Key validation: ${keyValid ? "valid" : "invalid"}`);
+}
+
 export function isAiAvailable(): boolean {
-  return client !== null;
+  return client !== null && keyValid;
 }
 
 interface GenerateResult {

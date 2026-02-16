@@ -41,7 +41,9 @@
       "Bash(bun add:*)",
       "Bash(bun run check:*)",
       "Bash(bun run test:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(echo:*)",
+      "Bash(jobs:*)"
     ]
   }
 }

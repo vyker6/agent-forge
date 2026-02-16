@@ -1,13 +1,13 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { OnboardingDialog } from "@/components/onboarding-dialog";
+import { OnboardingDialog, ONBOARDING_STORAGE_KEY } from "@/components/onboarding-dialog";
 import NotFound from "@/pages/not-found";
 import AgentsPage from "@/pages/agents";
 import AgentEditorPage from "@/pages/agent-editor";
@@ -18,10 +18,25 @@ import ImportPage from "@/pages/import";
 import TemplatesPage from "@/pages/templates";
 import AgentBuilderPage from "@/pages/agent-builder";
 
+function WelcomeRedirect() {
+  const { data: aiStatus, isLoading } = useQuery<{ available: boolean }>({
+    queryKey: ["/api/ai/status"],
+  });
+
+  if (isLoading) return null;
+
+  const onboardingDone = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+  if (!onboardingDone && aiStatus?.available) {
+    return <Redirect to="/build" />;
+  }
+
+  return <AgentsPage />;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={AgentsPage} />
+      <Route path="/" component={WelcomeRedirect} />
       <Route path="/agents" component={AgentsPage} />
       <Route path="/agents/:id" component={AgentEditorPage} />
       <Route path="/projects" component={ProjectsPage} />

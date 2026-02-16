@@ -10,7 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-const STORAGE_KEY = "agentMaker.onboardingComplete";
+export const ONBOARDING_STORAGE_KEY = "agentMaker.onboardingComplete";
+
+export function resetOnboarding() {
+  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+}
 
 export function OnboardingDialog() {
   const [, navigate] = useLocation();
@@ -18,14 +22,14 @@ export function OnboardingDialog() {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
-    const done = localStorage.getItem(STORAGE_KEY);
+    const done = localStorage.getItem(ONBOARDING_STORAGE_KEY);
     if (!done) {
       setOpen(true);
     }
   }, []);
 
   const dismiss = () => {
-    localStorage.setItem(STORAGE_KEY, "true");
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
     setOpen(false);
   };
 

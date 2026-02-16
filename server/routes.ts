@@ -609,7 +609,13 @@ export async function registerRoutes(
     try {
       const result = await generateAgentConfig(description, refinement, previousConfig);
       res.json(result);
-    } catch (err) {
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status;
+      if (status === 401 || status === 403) {
+        return res.status(502).json({
+          error: "API key is invalid or expired — check your ANTHROPIC_API_KEY",
+        });
+      }
       const message = err instanceof Error ? err.message : "Generation failed";
       res.status(422).json({ error: message });
     }

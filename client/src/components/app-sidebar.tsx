@@ -1,8 +1,9 @@
 import { useLocation, Link } from "wouter";
-import { Bot, FolderOpen, Rocket, Plus, Upload, Sparkles, MessageSquarePlus } from "lucide-react";
+import { Bot, FolderOpen, Rocket, Plus, Upload, Sparkles, MessageSquarePlus, RotateCcw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Agent } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
+import { resetOnboarding } from "@/components/onboarding-dialog";
 import {
   Sidebar,
   SidebarContent,
@@ -159,10 +160,22 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="px-2 py-1">
+        <div className="px-2 py-1 flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground font-mono">
             v1.0 &middot; Claude Code Agent Builder
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              resetOnboarding();
+              window.location.reload();
+            }}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="button-reset-tour"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset tour
+          </button>
         </div>
       </SidebarFooter>
     </Sidebar>

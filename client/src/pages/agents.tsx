@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, MoreVertical, Trash2, Copy } from "lucide-react";
+import { Plus, MoreVertical, Trash2, Copy, MessageSquarePlus } from "lucide-react";
 import type { Agent } from "@shared/schema";
 import { AVAILABLE_MODELS, MEMORY_SCOPES } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
@@ -22,6 +22,10 @@ export default function AgentsPage() {
 
   const { data: agents, isLoading } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
+  });
+
+  const { data: aiStatus } = useQuery<{ available: boolean }>({
+    queryKey: ["/api/ai/status"],
   });
 
   const deleteMutation = useMutation({
@@ -84,20 +88,42 @@ export default function AgentsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <Plus className="h-7 w-7 text-muted-foreground" />
+              {aiStatus?.available ? (
+                <MessageSquarePlus className="h-7 w-7 text-muted-foreground" />
+              ) : (
+                <Plus className="h-7 w-7 text-muted-foreground" />
+              )}
             </div>
             <div className="text-center">
               <h3 className="font-medium">No agents yet</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Describe what you need and we'll help you build your first agent
+                {aiStatus?.available
+                  ? "Describe what you need and we'll build your first agent with AI"
+                  : "Create your first agent to get started"}
               </p>
             </div>
-            <Button asChild variant="outline" data-testid="button-create-first-agent">
-              <Link href="/agents/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Agent
-              </Link>
-            </Button>
+            {aiStatus?.available ? (
+              <>
+                <Button asChild data-testid="button-create-first-agent">
+                  <Link href="/build">
+                    <MessageSquarePlus className="h-4 w-4 mr-2" />
+                    Build with AI
+                  </Link>
+                </Button>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/agents/new">
+                    or build from scratch
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <Button asChild variant="outline" data-testid="button-create-first-agent">
+                <Link href="/agents/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Agent
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
