@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Rocket, Download, Bot, CheckCircle2,
   Terminal as TerminalIcon,
-  AlertCircle, Package, Copy, Server
+  AlertCircle, Package, Copy
 } from "lucide-react";
 import type { Agent, Skill, Command, FileMapEntry, Project, ProjectAgent, McpServer, Rule, ProjectSettings, Hook } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
@@ -342,13 +342,13 @@ export default function DeployPage() {
                 <TerminalIcon className="h-5 w-5 text-muted-foreground" />
               </div>
               <div>
-                <h3 className="font-semibold">CLI Install Command</h3>
+                <h3 className="font-semibold">Quick Install</h3>
                 <p className="text-sm text-muted-foreground">
-                  Install this plugin directly via the command line
+                  Run this command from your project root to download and install
                 </p>
               </div>
             </div>
-            <CliCommand projectId={selectedProjectId} />
+            <QuickInstallCommand projectId={selectedProjectId} />
           </CardContent>
         </Card>
       )}
@@ -390,9 +390,9 @@ function Step({ number, title, children }: { number: number; title: string; chil
   );
 }
 
-function CliCommand({ projectId }: { projectId: string }) {
+function QuickInstallCommand({ projectId }: { projectId: string }) {
   const { toast } = useToast();
-  const command = `npx agent-maker install ${window.location.origin}/api/projects/${projectId}/export?format=json`;
+  const command = `curl -L ${window.location.origin}/api/projects/${projectId}/export -o project-config.zip && unzip project-config.zip -d .`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(command);
@@ -401,7 +401,7 @@ function CliCommand({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex items-center gap-2">
-      <code className="flex-1 bg-muted p-3 rounded-md text-xs font-mono overflow-auto">
+      <code className="flex-1 bg-muted p-3 rounded-md text-xs font-mono overflow-auto whitespace-pre-wrap break-all">
         {command}
       </code>
       <Button variant="outline" size="icon" onClick={handleCopy} data-testid="button-copy-cli">

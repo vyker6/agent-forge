@@ -261,8 +261,8 @@ export default function AgentEditorPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!isNew && (
-            <InstallModal agentName={form.name} form={form} skills={skills} commands={commands} />
+          {!isNew && agentId && (
+            <InstallModal agentId={agentId} agentName={form.name} form={form} skills={skills} commands={commands} />
           )}
           <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-agent">
             <Save className="h-4 w-4 mr-2" />
@@ -367,29 +367,42 @@ export default function AgentEditorPage() {
 }
 
 function InstallModal({
+  agentId,
   agentName,
   form,
   skills,
   commands,
 }: {
+  agentId: string;
   agentName: string;
   form: InsertAgent;
   skills: Skill[];
   commands: Command[];
 }) {
   const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const [copiedMd, setCopiedMd] = useState(false);
   const slug = agentName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "my-agent";
-  const cliCommand = `claude agent add ${slug}`;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(cliCommand);
-    setCopied(true);
-    toast({ title: "Copied to clipboard" });
-    setTimeout(() => setCopied(false), 2000);
+  const handleDownloadZip = async () => {
+    try {
+      const response = await fetch(`/api/agents/${agentId}/download`, { credentials: "include" });
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${slug}-agent.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Agent ZIP downloaded" });
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
   };
 
-  const handleDownload = () => {
+  const handleDownloadMd = () => {
     const agentData = {
       name: form.name,
       description: form.description ?? "",
@@ -415,7 +428,30 @@ function InstallModal({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: "Agent file downloaded" });
+    toast({ title: "Agent .md file downloaded" });
+  };
+
+  const handleCopyMarkdown = () => {
+    const agentData = {
+      name: form.name,
+      description: form.description ?? "",
+      tools: form.tools ?? [],
+      disallowedTools: form.disallowedTools ?? [],
+      model: form.model ?? "sonnet",
+      memoryScope: form.memoryScope ?? "project",
+      permissionMode: form.permissionMode ?? "default",
+      maxTurns: form.maxTurns ?? null,
+      preloadedSkills: form.preloadedSkills ?? [],
+      mcpServers: form.mcpServers ?? [],
+      systemPrompt: form.systemPrompt ?? "",
+    };
+    const files = generateAgentMarkdown(agentData, skills, commands);
+    const agentFile = Object.entries(files).find(([path]) => path.endsWith(`${slug}/AGENT.md`));
+    const content = agentFile ? agentFile[1] : Object.values(files)[0] ?? "";
+    navigator.clipboard.writeText(content);
+    setCopiedMd(true);
+    toast({ title: "Agent markdown copied to clipboard" });
+    setTimeout(() => setCopiedMd(false), 2000);
   };
 
   return (
@@ -430,26 +466,31 @@ function InstallModal({
         <DialogHeader>
           <DialogTitle>Install Agent</DialogTitle>
           <DialogDescription>
-            Add this agent to your project using the CLI or download the file directly.
+            Download and install this agent into your Claude Code project.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">CLI Command</Label>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted p-3 rounded-md text-xs font-mono overflow-auto">
-                {cliCommand}
-              </code>
-              <Button variant="outline" size="icon" onClick={handleCopy} data-testid="button-copy-install">
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-          <Separator />
-          <Button variant="secondary" className="w-full" onClick={handleDownload} data-testid="button-download-agent">
+          <Button className="w-full" onClick={handleDownloadZip} data-testid="button-download-zip">
             <Download className="h-4 w-4 mr-2" />
-            Download as .md File
+            Download Agent ZIP
           </Button>
+          <Button variant="secondary" className="w-full" onClick={handleDownloadMd} data-testid="button-download-agent">
+            <Download className="h-4 w-4 mr-2" />
+            Download .md File Only
+          </Button>
+          <Button variant="outline" className="w-full" onClick={handleCopyMarkdown} data-testid="button-copy-markdown">
+            {copiedMd ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+            {copiedMd ? "Copied!" : "Copy Agent Markdown"}
+          </Button>
+          <Separator />
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">How to install</Label>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+              <li>Download the ZIP file above</li>
+              <li>Extract into your project root (creates <code className="bg-muted px-1 rounded">.claude/</code> folders)</li>
+              <li>Start or restart Claude Code — agents are auto-discovered</li>
+            </ol>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

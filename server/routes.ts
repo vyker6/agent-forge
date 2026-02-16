@@ -588,6 +588,123 @@ export async function registerRoutes(
     await archive.finalize();
   });
 
+  // Single-agent ZIP download
+  app.get("/api/agents/:id/download", async (req, res) => {
+    const agent = await storage.getAgent(req.params.id);
+    if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+    const agentSkills = await storage.getSkills(req.params.id);
+    const agentCommands = await storage.getCommands(req.params.id);
+
+    const slug = agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${slug}-agent.zip"`);
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    // Build agent markdown
+    let agentMd = "---\n";
+    agentMd += `name: ${slug}\n`;
+    agentMd += `description: ${agent.description}\n`;
+    if (agent.tools.length > 0) {
+      agentMd += `tools: ${agent.tools.join(", ")}\n`;
+    }
+    if (agent.disallowedTools.length > 0) {
+      agentMd += `disallowedTools: ${agent.disallowedTools.join(", ")}\n`;
+    }
+    if (agent.model !== "inherit") {
+      agentMd += `model: ${agent.model}\n`;
+    }
+    agentMd += `memory: ${agent.memoryScope}\n`;
+    if (agent.permissionMode !== "default") {
+      agentMd += `permissionMode: ${agent.permissionMode}\n`;
+    }
+    if (agent.maxTurns != null) {
+      agentMd += `maxTurns: ${agent.maxTurns}\n`;
+    }
+    if (agent.preloadedSkills.length > 0) {
+      agentMd += `skills:\n`;
+      for (const s of agent.preloadedSkills) {
+        agentMd += `  - ${s}\n`;
+      }
+    }
+    if (agent.mcpServers.length > 0) {
+      agentMd += `mcpServers:\n`;
+      for (const s of agent.mcpServers) {
+        agentMd += `  - ${s}\n`;
+      }
+    }
+    agentMd += "---\n\n";
+    agentMd += agent.systemPrompt;
+    archive.append(agentMd, { name: `.claude/agents/${slug}.md` });
+
+    // Build skill markdowns
+    for (const skill of agentSkills) {
+      const skillSlug = skill.name.toLowerCase().replace(/\s+/g, "-");
+      let skillMd = "---\n";
+      skillMd += `name: ${skillSlug}\n`;
+      skillMd += `description: ${skill.description}\n`;
+      if (skill.context !== "main") {
+        skillMd += `context: ${skill.context}\n`;
+      }
+      if (skill.context === "fork" && skill.agentType !== "general-purpose") {
+        skillMd += `agent: ${skill.agentType}\n`;
+      }
+      if (skill.allowedTools.length > 0) {
+        skillMd += `allowed-tools: ${skill.allowedTools.join(", ")}\n`;
+      }
+      if (skill.argumentHint) {
+        skillMd += `argument-hint: "${skill.argumentHint}"\n`;
+      }
+      if (skill.disableModelInvocation === "true") {
+        skillMd += `disable-model-invocation: true\n`;
+      }
+      if (skill.userInvocable === "false") {
+        skillMd += `user-invocable: false\n`;
+      }
+      if (skill.model) {
+        skillMd += `model: ${skill.model}\n`;
+      }
+      skillMd += "---\n\n";
+      skillMd += skill.instructions;
+      archive.append(skillMd, { name: `.claude/skills/${skillSlug}/SKILL.md` });
+    }
+
+    // Build command markdowns
+    for (const cmd of agentCommands) {
+      let cmdMd = "---\n";
+      cmdMd += `description: ${cmd.description}\n`;
+      if (cmd.argumentHint) {
+        cmdMd += `argument-hint: "${cmd.argumentHint}"\n`;
+      }
+      if (cmd.disableModelInvocation === "true") {
+        cmdMd += `disable-model-invocation: true\n`;
+      }
+      if (cmd.userInvocable === "false") {
+        cmdMd += `user-invocable: false\n`;
+      }
+      if (cmd.model) {
+        cmdMd += `model: ${cmd.model}\n`;
+      }
+      if (cmd.context) {
+        cmdMd += `context: ${cmd.context}\n`;
+      }
+      if (cmd.context === "fork" && cmd.agentType) {
+        cmdMd += `agent: ${cmd.agentType}\n`;
+      }
+      if (cmd.allowedTools.length > 0) {
+        cmdMd += `allowed-tools: ${cmd.allowedTools.join(", ")}\n`;
+      }
+      cmdMd += "---\n\n";
+      cmdMd += cmd.promptTemplate;
+      archive.append(cmdMd, { name: `.claude/commands/${cmd.name}.md` });
+    }
+
+    await archive.finalize();
+  });
+
   // Agent likes endpoints
   app.post("/api/agents/:id/like", async (req, res) => {
     const clientId = req.headers["x-client-id"] as string;

@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, MoreVertical, Trash2, Copy, MessageSquarePlus, Heart, Download, Terminal as TerminalIcon } from "lucide-react";
+import { Plus, MoreVertical, Trash2, Copy, MessageSquarePlus, Heart, Download } from "lucide-react";
 import type { Agent } from "@shared/schema";
 import { AVAILABLE_MODELS, MEMORY_SCOPES } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
@@ -17,7 +17,6 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getClientId } from "@/lib/client-id";
-import { generateAgentMarkdown } from "@/lib/generate-markdown";
 
 export default function AgentsPage() {
   const { toast } = useToast();
@@ -70,27 +69,24 @@ export default function AgentsPage() {
     },
   });
 
-  const handleCopyInstall = (agent: Agent) => {
+  const handleDownloadZip = async (agent: Agent) => {
     const slug = agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    navigator.clipboard.writeText(`claude agent add ${slug}`);
-    toast({ title: "Install command copied" });
-  };
-
-  const handleDownload = (agent: Agent) => {
-    const slug = agent.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    const files = generateAgentMarkdown(agent, [], []);
-    const agentFile = Object.entries(files).find(([path]) => path.endsWith("AGENT.md"));
-    const content = agentFile ? agentFile[1] : Object.values(files)[0] ?? "";
-    const blob = new Blob([content], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast({ title: "Agent file downloaded" });
+    try {
+      const response = await fetch(`/api/agents/${agent.id}/download`, { credentials: "include" });
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${slug}-agent.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Agent ZIP downloaded" });
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -249,26 +245,15 @@ export default function AgentsPage() {
                       <Heart className="h-3.5 w-3.5" />
                       <span>{likeCount > 0 ? likeCount : ""}</span>
                     </button>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
-                        onClick={() => handleCopyInstall(agent)}
-                        title="Copy install command"
-                        data-testid={`button-install-${agent.id}`}
-                      >
-                        <TerminalIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
-                        onClick={() => handleDownload(agent)}
-                        title="Download agent file"
-                        data-testid={`button-download-${agent.id}`}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
+                      onClick={() => handleDownloadZip(agent)}
+                      title="Download agent"
+                      data-testid={`button-download-${agent.id}`}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </CardContent>
               </Card>

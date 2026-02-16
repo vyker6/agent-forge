@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
-import { Sparkles, Bot, RefreshCw, Puzzle, Terminal as TerminalIcon, Check, Copy, Settings2, Plus } from "lucide-react";
+import { Sparkles, Bot, RefreshCw, Puzzle, Terminal as TerminalIcon, Check, Download, Settings2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,7 +73,6 @@ export default function AgentBuilderPage() {
   const [config, setConfig] = useState<GeneratedConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdAgent, setCreatedAgent] = useState<{ id: string; name: string; slug: string } | null>(null);
-  const [copied, setCopied] = useState(false);
   const [progress, setProgress] = useState(0);
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -195,11 +194,22 @@ export default function AgentBuilderPage() {
   };
 
   if (createdAgent) {
-    const cliCommand = `claude agent add ${createdAgent.slug}`;
-    const handleCopy = () => {
-      navigator.clipboard.writeText(cliCommand);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    const handleDownload = async () => {
+      try {
+        const response = await fetch(`/api/agents/${createdAgent.id}/download`, { credentials: "include" });
+        if (!response.ok) throw new Error("Download failed");
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${createdAgent.slug}-agent.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch {
+        toast({ title: "Download failed", variant: "destructive" });
+      }
     };
     return (
       <div className="p-6 space-y-6 max-w-3xl mx-auto">
@@ -217,16 +227,17 @@ export default function AgentBuilderPage() {
 
         <Card>
           <CardContent className="p-6 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-2">Install via CLI</h3>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-muted p-3 rounded-md text-xs font-mono overflow-auto">
-                  {cliCommand}
-                </code>
-                <Button variant="outline" size="icon" onClick={handleCopy} data-testid="button-copy-cli">
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
+            <Button className="w-full" onClick={handleDownload} data-testid="button-download-agent">
+              <Download className="h-4 w-4 mr-2" />
+              Download Agent
+            </Button>
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">How to install</h3>
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                <li>Download the ZIP file above</li>
+                <li>Extract into your project root (creates <code className="bg-muted px-1 rounded">.claude/</code> folders)</li>
+                <li>Start or restart Claude Code — agents are auto-discovered</li>
+              </ol>
             </div>
           </CardContent>
         </Card>
