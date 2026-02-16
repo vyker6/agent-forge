@@ -11,6 +11,7 @@ import NotFound from "@/pages/not-found";
 import AgentsPage from "@/pages/agents";
 import AgentEditorPage from "@/pages/agent-editor";
 import ProjectsPage from "@/pages/projects";
+import ProjectEditorPage from "@/pages/project-editor";
 import DeployPage from "@/pages/deploy";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/agents" component={AgentsPage} />
       <Route path="/agents/:id" component={AgentEditorPage} />
       <Route path="/projects" component={ProjectsPage} />
+      <Route path="/projects/:id" component={ProjectEditorPage} />
       <Route path="/deploy" component={DeployPage} />
       <Route component={NotFound} />
     </Switch>

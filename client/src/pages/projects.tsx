@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Plus, FolderOpen, Trash2, MoreVertical, Bot, ChevronRight } from "lucide-react";
 import type { Agent, Project, ProjectAgent } from "@shared/schema";
 import { AgentIcon } from "@/components/agent-icon";
@@ -204,8 +204,10 @@ function ProjectCard({
     },
   });
 
+  const [, navigate] = useLocation();
+
   return (
-    <Card className="hover-elevate" data-testid={`card-project-${project.id}`}>
+    <Card className="hover-elevate cursor-pointer" data-testid={`card-project-${project.id}`} onClick={() => navigate(`/projects/${project.id}`)}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-3 min-w-0">
@@ -223,14 +225,14 @@ function ProjectCard({
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" data-testid={`button-project-menu-${project.id}`}>
+              <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} data-testid={`button-project-menu-${project.id}`}>
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={onDelete}
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 data-testid={`button-delete-project-${project.id}`}
               >
                 <Trash2 className="h-4 w-4 mr-2" />

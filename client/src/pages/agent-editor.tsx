@@ -6,7 +6,7 @@ import {
   FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File
 } from "lucide-react";
 import type { Agent, Skill, Command, FileMapEntry, InsertAgent } from "@shared/schema";
-import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES } from "@shared/schema";
+import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES, PERMISSION_MODES } from "@shared/schema";
 import { AgentIcon, AgentIconPicker } from "@/components/agent-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +32,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +50,11 @@ export default function AgentEditorPage() {
     systemPrompt: "",
     model: "sonnet",
     tools: [],
+    disallowedTools: [],
     memoryScope: "project",
+    permissionMode: "default",
+    maxTurns: null,
+    preloadedSkills: [],
     icon: "bot",
     color: "#3b82f6",
   });
@@ -82,7 +87,11 @@ export default function AgentEditorPage() {
         systemPrompt: agent.systemPrompt,
         model: agent.model,
         tools: agent.tools,
+        disallowedTools: agent.disallowedTools,
         memoryScope: agent.memoryScope,
+        permissionMode: agent.permissionMode,
+        maxTurns: agent.maxTurns,
+        preloadedSkills: agent.preloadedSkills,
         icon: agent.icon,
         color: agent.color,
       });
@@ -122,9 +131,18 @@ export default function AgentEditorPage() {
   const toggleTool = (tool: string) => {
     setForm((prev) => ({
       ...prev,
-      tools: prev.tools.includes(tool)
-        ? prev.tools.filter((t) => t !== tool)
-        : [...prev.tools, tool],
+      tools: (prev.tools ?? []).includes(tool)
+        ? (prev.tools ?? []).filter((t) => t !== tool)
+        : [...(prev.tools ?? []), tool],
+    }));
+  };
+
+  const toggleDisallowedTool = (tool: string) => {
+    setForm((prev) => ({
+      ...prev,
+      disallowedTools: (prev.disallowedTools ?? []).includes(tool)
+        ? (prev.disallowedTools ?? []).filter((t: string) => t !== tool)
+        : [...(prev.disallowedTools ?? []), tool],
     }));
   };
 
@@ -144,7 +162,7 @@ export default function AgentEditorPage() {
           <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <AgentIcon icon={form.icon} color={form.color} size="md" className="p-1.5 shrink-0" />
+          <AgentIcon icon={form.icon ?? "bot"} color={form.color ?? "#3b82f6"} size="md" className="p-1.5 shrink-0" />
           <div className="min-w-0">
             <h1 className="text-lg font-semibold truncate" data-testid="text-editor-title">
               {isNew ? "New Agent" : form.name || "Untitled"}
@@ -218,6 +236,8 @@ export default function AgentEditorPage() {
                 form={form}
                 setForm={setForm}
                 toggleTool={toggleTool}
+                toggleDisallowedTool={toggleDisallowedTool}
+                skills={skills}
               />
             </TabsContent>
 
@@ -245,10 +265,14 @@ function AgentConfigForm({
   form,
   setForm,
   toggleTool,
+  toggleDisallowedTool,
+  skills,
 }: {
   form: InsertAgent;
   setForm: React.Dispatch<React.SetStateAction<InsertAgent>>;
   toggleTool: (tool: string) => void;
+  toggleDisallowedTool: (tool: string) => void;
+  skills: Skill[];
 }) {
   return (
     <div className="space-y-6">
@@ -278,8 +302,8 @@ function AgentConfigForm({
         <Card>
           <CardContent className="p-4">
             <AgentIconPicker
-              selectedIcon={form.icon}
-              selectedColor={form.color}
+              selectedIcon={form.icon ?? "bot"}
+              selectedColor={form.color ?? "#3b82f6"}
               onIconChange={(icon) => setForm((f) => ({ ...f, icon }))}
               onColorChange={(color) => setForm((f) => ({ ...f, color }))}
             />
@@ -358,8 +382,8 @@ function AgentConfigForm({
           {AVAILABLE_TOOLS.map((tool) => (
             <Badge
               key={tool}
-              variant={form.tools.includes(tool) ? "default" : "outline"}
-              className={`cursor-pointer toggle-elevate ${form.tools.includes(tool) ? "toggle-elevated" : ""}`}
+              variant={(form.tools ?? []).includes(tool) ? "default" : "outline"}
+              className={`cursor-pointer toggle-elevate ${(form.tools ?? []).includes(tool) ? "toggle-elevated" : ""}`}
               onClick={() => toggleTool(tool)}
               data-testid={`badge-tool-${tool}`}
             >
@@ -386,6 +410,295 @@ function AgentConfigForm({
           </Button>
         </div>
       </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <div>
+          <Label>Disallowed Tools</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Tools this agent is explicitly denied from using
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {AVAILABLE_TOOLS.map((tool) => (
+            <Badge
+              key={tool}
+              variant={(form.disallowedTools ?? []).includes(tool) ? "destructive" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleDisallowedTool(tool)}
+            >
+              {tool}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <Label>Permission Mode</Label>
+          <p className="text-xs text-muted-foreground">
+            How the agent handles permission requests
+          </p>
+          <Select
+            value={form.permissionMode ?? "default"}
+            onValueChange={(v) => setForm((f) => ({ ...f, permissionMode: v }))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERMISSION_MODES.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Max Turns</Label>
+          <p className="text-xs text-muted-foreground">
+            Limit agentic turns (blank = unlimited)
+          </p>
+          <Input
+            type="number"
+            min={1}
+            value={form.maxTurns ?? ""}
+            onChange={(e) => setForm((f) => ({
+              ...f,
+              maxTurns: e.target.value ? parseInt(e.target.value, 10) : null,
+            }))}
+            placeholder="Unlimited"
+          />
+        </div>
+      </div>
+
+      {skills.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div>
+              <Label>Preloaded Skills</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Skills whose content is injected into this agent&apos;s context at startup
+              </p>
+            </div>
+            <div className="space-y-2">
+              {skills.map((skill) => {
+                const slug = skill.name.toLowerCase().replace(/\s+/g, "-");
+                const checked = (form.preloadedSkills ?? []).includes(slug);
+                return (
+                  <label key={skill.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(val) => {
+                        setForm((f) => ({
+                          ...f,
+                          preloadedSkills: val
+                            ? [...(f.preloadedSkills ?? []), slug]
+                            : (f.preloadedSkills ?? []).filter((s: string) => s !== slug),
+                        }));
+                      }}
+                    />
+                    <span className="text-sm">{skill.name}</span>
+                    <span className="text-xs text-muted-foreground">({slug})</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SkillFormFields({
+  form,
+  setForm,
+}: {
+  form: {
+    name: string;
+    description: string;
+    instructions: string;
+    context: string;
+    allowedTools: string[];
+    argumentHint: string;
+    agentType: string;
+    model: string;
+    disableModelInvocation: string;
+    userInvocable: string;
+  };
+  setForm: (updater: (prev: typeof form) => typeof form) => void;
+}) {
+  const toggleSkillTool = (tool: string) => {
+    setForm((prev) => ({
+      ...prev,
+      allowedTools: prev.allowedTools.includes(tool)
+        ? prev.allowedTools.filter((t) => t !== tool)
+        : [...prev.allowedTools, tool],
+    }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+            placeholder="e.g. pdf-processing"
+            data-testid="input-skill-name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Context</Label>
+          <Select
+            value={form.context}
+            onValueChange={(v) => setForm((s) => ({ ...s, context: v }))}
+          >
+            <SelectTrigger data-testid="select-skill-context">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="main">Main</SelectItem>
+              <SelectItem value="fork">Fork (Separate Context)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Description</Label>
+        <Input
+          value={form.description}
+          onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+          placeholder="When to use this skill"
+          data-testid="input-skill-description"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Argument Hint</Label>
+        <Input
+          value={form.argumentHint}
+          onChange={(e) => setForm((s) => ({ ...s, argumentHint: e.target.value }))}
+          placeholder="[file-path]"
+          data-testid="input-skill-argument-hint"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Instructions (SKILL.md content)</Label>
+        <Textarea
+          value={form.instructions}
+          onChange={(e) => setForm((s) => ({ ...s, instructions: e.target.value }))}
+          placeholder="# Skill Instructions&#10;&#10;Describe what this skill does and how to use it..."
+          className="min-h-[150px] font-mono text-sm"
+          data-testid="textarea-skill-instructions"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label>Allowed Tools</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Select which tools this skill can use
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {AVAILABLE_TOOLS.map((tool) => (
+            <Badge
+              key={tool}
+              variant={form.allowedTools.includes(tool) ? "default" : "outline"}
+              className={`cursor-pointer toggle-elevate ${form.allowedTools.includes(tool) ? "toggle-elevated" : ""}`}
+              onClick={() => toggleSkillTool(tool)}
+              data-testid={`badge-skill-tool-${tool}`}
+            >
+              {tool}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Model</Label>
+          <Select
+            value={form.model}
+            onValueChange={(v) => setForm((s) => ({ ...s, model: v }))}
+          >
+            <SelectTrigger data-testid="select-skill-model">
+              <SelectValue placeholder="Inherit (Default)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Inherit (Default)</SelectItem>
+              <SelectItem value="sonnet">Claude Sonnet</SelectItem>
+              <SelectItem value="opus">Claude Opus</SelectItem>
+              <SelectItem value="haiku">Claude Haiku</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {form.context === "fork" && (
+          <div className="space-y-2">
+            <Label>Agent Type</Label>
+            <Select
+              value={form.agentType}
+              onValueChange={(v) => setForm((s) => ({ ...s, agentType: v }))}
+            >
+              <SelectTrigger data-testid="select-skill-agent-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general-purpose">General Purpose</SelectItem>
+                <SelectItem value="Explore">Explore</SelectItem>
+                <SelectItem value="Plan">Plan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Disable auto-invocation</Label>
+            <p className="text-xs text-muted-foreground">
+              Prevent the model from automatically invoking this skill
+            </p>
+          </div>
+          <Switch
+            checked={form.disableModelInvocation === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, disableModelInvocation: checked ? "true" : "false" }))
+            }
+            data-testid="switch-skill-disable-invocation"
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>User invocable (show in / menu)</Label>
+            <p className="text-xs text-muted-foreground">
+              Allow users to invoke this skill from the slash command menu
+            </p>
+          </div>
+          <Switch
+            checked={form.userInvocable === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, userInvocable: checked ? "true" : "false" }))
+            }
+            data-testid="switch-skill-user-invocable"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -393,13 +706,23 @@ function AgentConfigForm({
 function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
   const { toast } = useToast();
   const [showNew, setShowNew] = useState(false);
-  const [newSkill, setNewSkill] = useState({
+  const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+
+  const emptySkillForm = {
     name: "",
     description: "",
     instructions: "",
     context: "main",
     allowedTools: [] as string[],
-  });
+    argumentHint: "",
+    agentType: "general-purpose",
+    model: "",
+    disableModelInvocation: "false",
+    userInvocable: "true",
+  };
+
+  const [newSkill, setNewSkill] = useState(emptySkillForm);
+  const [editForm, setEditForm] = useState(emptySkillForm);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof newSkill) => {
@@ -409,8 +732,24 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "skills"] });
       setShowNew(false);
-      setNewSkill({ name: "", description: "", instructions: "", context: "main", allowedTools: [] });
+      setNewSkill({ ...emptySkillForm, allowedTools: [] });
       toast({ title: "Skill created" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof editForm & { id: string }) => {
+      const { id, ...body } = data;
+      const res = await apiRequest("PATCH", `/api/skills/${id}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "skills"] });
+      setEditingSkillId(null);
+      toast({ title: "Skill updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating skill", description: err.message, variant: "destructive" });
     },
   });
 
@@ -423,6 +762,22 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
       toast({ title: "Skill deleted" });
     },
   });
+
+  const startEditing = (skill: Skill) => {
+    setEditingSkillId(skill.id);
+    setEditForm({
+      name: skill.name,
+      description: skill.description,
+      instructions: skill.instructions,
+      context: skill.context,
+      allowedTools: [...skill.allowedTools],
+      argumentHint: skill.argumentHint,
+      agentType: skill.agentType,
+      model: skill.model,
+      disableModelInvocation: skill.disableModelInvocation,
+      userInvocable: skill.userInvocable,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -442,53 +797,16 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
       {showNew && (
         <Card>
           <CardContent className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={newSkill.name}
-                  onChange={(e) => setNewSkill((s) => ({ ...s, name: e.target.value }))}
-                  placeholder="e.g. pdf-processing"
-                  data-testid="input-skill-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Context</Label>
-                <Select
-                  value={newSkill.context}
-                  onValueChange={(v) => setNewSkill((s) => ({ ...s, context: v }))}
-                >
-                  <SelectTrigger data-testid="select-skill-context">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="main">Main</SelectItem>
-                    <SelectItem value="fork">Fork (Separate Context)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                value={newSkill.description}
-                onChange={(e) => setNewSkill((s) => ({ ...s, description: e.target.value }))}
-                placeholder="When to use this skill"
-                data-testid="input-skill-description"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Instructions (SKILL.md content)</Label>
-              <Textarea
-                value={newSkill.instructions}
-                onChange={(e) => setNewSkill((s) => ({ ...s, instructions: e.target.value }))}
-                placeholder="# Skill Instructions&#10;&#10;Describe what this skill does and how to use it..."
-                className="min-h-[150px] font-mono text-sm"
-                data-testid="textarea-skill-instructions"
-              />
-            </div>
+            <SkillFormFields form={newSkill} setForm={setNewSkill} />
             <div className="flex items-center gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowNew(false)} data-testid="button-cancel-skill">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowNew(false);
+                  setNewSkill({ ...emptySkillForm, allowedTools: [] });
+                }}
+                data-testid="button-cancel-skill"
+              >
                 Cancel
               </Button>
               <Button
@@ -515,31 +833,74 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
           {skills.map((skill) => (
             <Card key={skill.id} data-testid={`card-skill-${skill.id}`}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
-                      <Puzzle className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-sm">{skill.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">{skill.description}</p>
-                      {skill.instructions && (
-                        <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-24 font-mono">
-                          {skill.instructions.slice(0, 200)}
-                          {skill.instructions.length > 200 ? "..." : ""}
-                        </pre>
-                      )}
+                {editingSkillId === skill.id ? (
+                  <div className="space-y-4">
+                    <SkillFormFields form={editForm} setForm={setEditForm} />
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setEditingSkillId(null)}
+                        data-testid="button-cancel-edit-skill"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => updateMutation.mutate({ ...editForm, id: skill.id })}
+                        disabled={!editForm.name.trim() || updateMutation.isPending}
+                        data-testid="button-save-edit-skill"
+                      >
+                        {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteMutation.mutate(skill.id)}
-                    data-testid={`button-delete-skill-${skill.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                      onClick={() => startEditing(skill)}
+                    >
+                      <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
+                        <Puzzle className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-medium text-sm">{skill.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">{skill.description}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          <Badge variant="secondary" className="text-[10px]">{skill.context}</Badge>
+                          {skill.model && (
+                            <Badge variant="secondary" className="text-[10px]">model: {skill.model}</Badge>
+                          )}
+                          {skill.context === "fork" && (
+                            <Badge variant="secondary" className="text-[10px]">{skill.agentType}</Badge>
+                          )}
+                          {skill.disableModelInvocation === "true" && (
+                            <Badge variant="outline" className="text-[10px]">Auto-invoke: off</Badge>
+                          )}
+                          {skill.userInvocable === "false" && (
+                            <Badge variant="outline" className="text-[10px]">Hidden from menu</Badge>
+                          )}
+                        </div>
+                        {skill.instructions && (
+                          <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-24 font-mono">
+                            {skill.instructions.slice(0, 200)}
+                            {skill.instructions.length > 200 ? "..." : ""}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMutation.mutate(skill.id);
+                      }}
+                      data-testid={`button-delete-skill-${skill.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -549,10 +910,222 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
   );
 }
 
+function CommandFormFields({
+  form,
+  setForm,
+}: {
+  form: {
+    name: string;
+    description: string;
+    promptTemplate: string;
+    argumentHint: string;
+    context: string;
+    agentType: string;
+    allowedTools: string[];
+    model: string;
+    disableModelInvocation: string;
+    userInvocable: string;
+  };
+  setForm: (updater: (prev: typeof form) => typeof form) => void;
+}) {
+  const toggleCommandTool = (tool: string) => {
+    setForm((prev) => ({
+      ...prev,
+      allowedTools: prev.allowedTools.includes(tool)
+        ? prev.allowedTools.filter((t) => t !== tool)
+        : [...prev.allowedTools, tool],
+    }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Command Name</Label>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-muted-foreground">/</span>
+            <Input
+              value={form.name}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, name: e.target.value.replace(/\s+/g, "-").toLowerCase() }))
+              }
+              placeholder="review-code"
+              data-testid="input-command-name"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Description</Label>
+          <Input
+            value={form.description}
+            onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+            placeholder="What this command does"
+            data-testid="input-command-description"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Argument Hint</Label>
+        <Input
+          value={form.argumentHint}
+          onChange={(e) => setForm((s) => ({ ...s, argumentHint: e.target.value }))}
+          placeholder="[PR-number]"
+          data-testid="input-command-argument-hint"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Prompt Template</Label>
+        <Textarea
+          value={form.promptTemplate}
+          onChange={(e) => setForm((s) => ({ ...s, promptTemplate: e.target.value }))}
+          placeholder="Review the following code for security vulnerabilities and best practices..."
+          className="min-h-[120px] font-mono text-sm"
+          data-testid="textarea-command-template"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Context</Label>
+          <Select
+            value={form.context}
+            onValueChange={(v) => setForm((s) => ({ ...s, context: v }))}
+          >
+            <SelectTrigger data-testid="select-command-context">
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">None</SelectItem>
+              <SelectItem value="main">Main</SelectItem>
+              <SelectItem value="fork">Fork (Separate Context)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {form.context === "fork" && (
+          <div className="space-y-2">
+            <Label>Agent Type</Label>
+            <Select
+              value={form.agentType}
+              onValueChange={(v) => setForm((s) => ({ ...s, agentType: v }))}
+            >
+              <SelectTrigger data-testid="select-command-agent-type">
+                <SelectValue placeholder="Default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Default</SelectItem>
+                <SelectItem value="general-purpose">General Purpose</SelectItem>
+                <SelectItem value="Explore">Explore</SelectItem>
+                <SelectItem value="Plan">Plan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label>Allowed Tools</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Select which tools this command can use
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {AVAILABLE_TOOLS.map((tool) => (
+            <Badge
+              key={tool}
+              variant={form.allowedTools.includes(tool) ? "default" : "outline"}
+              className={`cursor-pointer toggle-elevate ${form.allowedTools.includes(tool) ? "toggle-elevated" : ""}`}
+              onClick={() => toggleCommandTool(tool)}
+              data-testid={`badge-command-tool-${tool}`}
+            >
+              {tool}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Model</Label>
+          <Select
+            value={form.model}
+            onValueChange={(v) => setForm((s) => ({ ...s, model: v }))}
+          >
+            <SelectTrigger data-testid="select-command-model">
+              <SelectValue placeholder="Inherit (Default)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Inherit (Default)</SelectItem>
+              <SelectItem value="sonnet">Claude Sonnet</SelectItem>
+              <SelectItem value="opus">Claude Opus</SelectItem>
+              <SelectItem value="haiku">Claude Haiku</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Disable auto-invocation</Label>
+            <p className="text-xs text-muted-foreground">
+              Prevent the model from automatically invoking this command
+            </p>
+          </div>
+          <Switch
+            checked={form.disableModelInvocation === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, disableModelInvocation: checked ? "true" : "false" }))
+            }
+            data-testid="switch-command-disable-invocation"
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>User invocable (show in / menu)</Label>
+            <p className="text-xs text-muted-foreground">
+              Allow users to invoke this command from the slash command menu
+            </p>
+          </div>
+          <Switch
+            checked={form.userInvocable === "true"}
+            onCheckedChange={(checked) =>
+              setForm((s) => ({ ...s, userInvocable: checked ? "true" : "false" }))
+            }
+            data-testid="switch-command-user-invocable"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CommandsTab({ agentId, commands }: { agentId: string; commands: Command[] }) {
   const { toast } = useToast();
   const [showNew, setShowNew] = useState(false);
-  const [newCmd, setNewCmd] = useState({ name: "", description: "", promptTemplate: "" });
+  const [editingCommandId, setEditingCommandId] = useState<string | null>(null);
+
+  const emptyCommandForm = {
+    name: "",
+    description: "",
+    promptTemplate: "",
+    argumentHint: "",
+    context: "",
+    agentType: "",
+    allowedTools: [] as string[],
+    model: "",
+    disableModelInvocation: "false",
+    userInvocable: "true",
+  };
+
+  const [newCmd, setNewCmd] = useState(emptyCommandForm);
+  const [editForm, setEditForm] = useState(emptyCommandForm);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof newCmd) => {
@@ -562,8 +1135,24 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "commands"] });
       setShowNew(false);
-      setNewCmd({ name: "", description: "", promptTemplate: "" });
+      setNewCmd({ ...emptyCommandForm, allowedTools: [] });
       toast({ title: "Command created" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof editForm & { id: string }) => {
+      const { id, ...body } = data;
+      const res = await apiRequest("PATCH", `/api/commands/${id}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agents", agentId, "commands"] });
+      setEditingCommandId(null);
+      toast({ title: "Command updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error updating command", description: err.message, variant: "destructive" });
     },
   });
 
@@ -576,6 +1165,22 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
       toast({ title: "Command deleted" });
     },
   });
+
+  const startEditing = (cmd: Command) => {
+    setEditingCommandId(cmd.id);
+    setEditForm({
+      name: cmd.name,
+      description: cmd.description,
+      promptTemplate: cmd.promptTemplate,
+      argumentHint: cmd.argumentHint,
+      context: cmd.context,
+      agentType: cmd.agentType,
+      allowedTools: [...cmd.allowedTools],
+      model: cmd.model,
+      disableModelInvocation: cmd.disableModelInvocation,
+      userInvocable: cmd.userInvocable,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -595,41 +1200,16 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
       {showNew && (
         <Card>
           <CardContent className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Command Name</Label>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm text-muted-foreground">/</span>
-                  <Input
-                    value={newCmd.name}
-                    onChange={(e) => setNewCmd((c) => ({ ...c, name: e.target.value.replace(/\s/g, "-").toLowerCase() }))}
-                    placeholder="review-code"
-                    data-testid="input-command-name"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  value={newCmd.description}
-                  onChange={(e) => setNewCmd((c) => ({ ...c, description: e.target.value }))}
-                  placeholder="What this command does"
-                  data-testid="input-command-description"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Prompt Template</Label>
-              <Textarea
-                value={newCmd.promptTemplate}
-                onChange={(e) => setNewCmd((c) => ({ ...c, promptTemplate: e.target.value }))}
-                placeholder="Review the following code for security vulnerabilities and best practices..."
-                className="min-h-[120px] font-mono text-sm"
-                data-testid="textarea-command-template"
-              />
-            </div>
+            <CommandFormFields form={newCmd} setForm={setNewCmd} />
             <div className="flex items-center gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowNew(false)} data-testid="button-cancel-command">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowNew(false);
+                  setNewCmd({ ...emptyCommandForm, allowedTools: [] });
+                }}
+                data-testid="button-cancel-command"
+              >
                 Cancel
               </Button>
               <Button
@@ -656,33 +1236,78 @@ function CommandsTab({ agentId, commands }: { agentId: string; commands: Command
           {commands.map((cmd) => (
             <Card key={cmd.id} data-testid={`card-command-${cmd.id}`}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
-                      <TerminalIcon className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <code className="text-sm font-mono font-medium">/{cmd.name}</code>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{cmd.description}</p>
-                      {cmd.promptTemplate && (
-                        <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-20 font-mono">
-                          {cmd.promptTemplate.slice(0, 150)}
-                          {cmd.promptTemplate.length > 150 ? "..." : ""}
-                        </pre>
-                      )}
+                {editingCommandId === cmd.id ? (
+                  <div className="space-y-4">
+                    <CommandFormFields form={editForm} setForm={setEditForm} />
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setEditingCommandId(null)}
+                        data-testid="button-cancel-edit-command"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => updateMutation.mutate({ ...editForm, id: cmd.id })}
+                        disabled={!editForm.name.trim() || updateMutation.isPending}
+                        data-testid="button-save-edit-command"
+                      >
+                        {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteMutation.mutate(cmd.id)}
-                    data-testid={`button-delete-command-${cmd.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                      onClick={() => startEditing(cmd)}
+                    >
+                      <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center shrink-0">
+                        <TerminalIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <code className="text-sm font-mono font-medium">/{cmd.name}</code>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{cmd.description}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {cmd.context && (
+                            <Badge variant="secondary" className="text-[10px]">{cmd.context}</Badge>
+                          )}
+                          {cmd.model && (
+                            <Badge variant="secondary" className="text-[10px]">model: {cmd.model}</Badge>
+                          )}
+                          {cmd.context === "fork" && cmd.agentType && (
+                            <Badge variant="secondary" className="text-[10px]">{cmd.agentType}</Badge>
+                          )}
+                          {cmd.disableModelInvocation === "true" && (
+                            <Badge variant="outline" className="text-[10px]">Auto-invoke: off</Badge>
+                          )}
+                          {cmd.userInvocable === "false" && (
+                            <Badge variant="outline" className="text-[10px]">Hidden from menu</Badge>
+                          )}
+                        </div>
+                        {cmd.promptTemplate && (
+                          <pre className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded-md overflow-auto max-h-20 font-mono">
+                            {cmd.promptTemplate.slice(0, 150)}
+                            {cmd.promptTemplate.length > 150 ? "..." : ""}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMutation.mutate(cmd.id);
+                      }}
+                      data-testid={`button-delete-command-${cmd.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

@@ -4,7 +4,8 @@ import archiver from "archiver";
 import { storage } from "./storage";
 import {
   insertAgentSchema, insertSkillSchema, insertCommandSchema,
-  insertFileMapEntrySchema, insertProjectSchema, insertProjectAgentSchema
+  insertFileMapEntrySchema, insertProjectSchema, insertProjectAgentSchema,
+  insertRuleSchema, insertProjectSettingsSchema, insertHookSchema
 } from "@shared/schema";
 
 export async function registerRoutes(
@@ -62,6 +63,14 @@ export async function registerRoutes(
     res.status(201).json(skill);
   });
 
+  app.patch("/api/skills/:id", async (req, res) => {
+    const parsed = insertSkillSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const skill = await storage.updateSkill(req.params.id, parsed.data);
+    if (!skill) return res.status(404).json({ error: "Skill not found" });
+    res.json(skill);
+  });
+
   app.delete("/api/skills/:id", async (req, res) => {
     await storage.deleteSkill(req.params.id);
     res.status(204).end();
@@ -78,6 +87,14 @@ export async function registerRoutes(
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
     const cmd = await storage.createCommand(parsed.data);
     res.status(201).json(cmd);
+  });
+
+  app.patch("/api/commands/:id", async (req, res) => {
+    const parsed = insertCommandSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const cmd = await storage.updateCommand(req.params.id, parsed.data);
+    if (!cmd) return res.status(404).json({ error: "Command not found" });
+    res.json(cmd);
   });
 
   app.delete("/api/commands/:id", async (req, res) => {
@@ -138,6 +155,81 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  app.patch("/api/projects/:id", async (req, res) => {
+    const parsed = insertProjectSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const project = await storage.updateProject(req.params.id, parsed.data);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+    res.json(project);
+  });
+
+  // Rules
+  app.get("/api/projects/:id/rules", async (req, res) => {
+    const items = await storage.getRules(req.params.id);
+    res.json(items);
+  });
+
+  app.post("/api/projects/:id/rules", async (req, res) => {
+    const data = { ...req.body, projectId: req.params.id };
+    const parsed = insertRuleSchema.safeParse(data);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const rule = await storage.createRule(parsed.data);
+    res.status(201).json(rule);
+  });
+
+  app.patch("/api/rules/:id", async (req, res) => {
+    const parsed = insertRuleSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const rule = await storage.updateRule(req.params.id, parsed.data);
+    if (!rule) return res.status(404).json({ error: "Rule not found" });
+    res.json(rule);
+  });
+
+  app.delete("/api/rules/:id", async (req, res) => {
+    await storage.deleteRule(req.params.id);
+    res.status(204).end();
+  });
+
+  // Project Settings
+  app.get("/api/projects/:id/settings", async (req, res) => {
+    const settings = await storage.getProjectSettings(req.params.id);
+    res.json(settings || null);
+  });
+
+  app.put("/api/projects/:id/settings", async (req, res) => {
+    const parsed = insertProjectSettingsSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const settings = await storage.upsertProjectSettings(req.params.id, parsed.data);
+    res.json(settings);
+  });
+
+  // Hooks
+  app.get("/api/projects/:id/hooks", async (req, res) => {
+    const items = await storage.getHooks(req.params.id);
+    res.json(items);
+  });
+
+  app.post("/api/projects/:id/hooks", async (req, res) => {
+    const data = { ...req.body, projectId: req.params.id };
+    const parsed = insertHookSchema.safeParse(data);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const hook = await storage.createHook(parsed.data);
+    res.status(201).json(hook);
+  });
+
+  app.patch("/api/hooks/:id", async (req, res) => {
+    const parsed = insertHookSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const hook = await storage.updateHook(req.params.id, parsed.data);
+    if (!hook) return res.status(404).json({ error: "Hook not found" });
+    res.json(hook);
+  });
+
+  app.delete("/api/hooks/:id", async (req, res) => {
+    await storage.deleteHook(req.params.id);
+    res.status(204).end();
+  });
+
   app.get("/api/projects/:id/export", async (req, res) => {
     const project = await storage.getProject(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
@@ -154,6 +246,10 @@ export async function registerRoutes(
       const agentFileMap = await storage.getFileMapEntries(aid);
       agentList.push({ agent, skills: agentSkills, commands: agentCommands, fileMap: agentFileMap });
     }
+
+    const projectRules = await storage.getRules(project.id);
+    const projectSettings = await storage.getProjectSettings(project.id);
+    const projectHooks = await storage.getHooks(project.id);
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${project.name}-claude-config.zip"`);
@@ -179,17 +275,104 @@ export async function registerRoutes(
     archive.append("", { name: ".claude/agents/.gitkeep" });
     archive.append("", { name: ".claude/commands/.gitkeep" });
     archive.append("", { name: ".claude/skills/.gitkeep" });
+    archive.append("", { name: ".claude/rules/.gitkeep" });
+
+    // Export rules as .claude/rules/{name}.md
+    for (const rule of projectRules) {
+      const slug = rule.name.toLowerCase().replace(/\s+/g, "-");
+      let ruleMd = "";
+      if (rule.paths.length > 0) {
+        ruleMd += "---\npaths:\n";
+        for (const p of rule.paths) {
+          ruleMd += `  - "${p}"\n`;
+        }
+        ruleMd += "---\n\n";
+      }
+      ruleMd += rule.content;
+      archive.append(ruleMd, { name: `.claude/rules/${slug}.md` });
+    }
+
+    // Export settings.json with settings + hooks
+    const settingsJson: Record<string, unknown> = {};
+    if (projectSettings) {
+      if (projectSettings.permissionAllow.length > 0 || projectSettings.permissionDeny.length > 0 || projectSettings.permissionAsk.length > 0) {
+        const perms: Record<string, string[]> = {};
+        if (projectSettings.permissionAllow.length > 0) perms.allow = projectSettings.permissionAllow;
+        if (projectSettings.permissionDeny.length > 0) perms.deny = projectSettings.permissionDeny;
+        if (projectSettings.permissionAsk.length > 0) perms.ask = projectSettings.permissionAsk;
+        settingsJson.permissions = perms;
+      }
+      if (projectSettings.defaultPermissionMode) {
+        settingsJson.defaultPermissionMode = projectSettings.defaultPermissionMode;
+      }
+      const sandbox: Record<string, unknown> = {};
+      if (projectSettings.sandboxEnabled) sandbox.enabled = projectSettings.sandboxEnabled === "true";
+      if (projectSettings.sandboxAutoAllow) sandbox.autoAllow = projectSettings.sandboxAutoAllow === "true";
+      if (projectSettings.sandboxAllowedDomains.length > 0) sandbox.allowedDomains = projectSettings.sandboxAllowedDomains;
+      if (projectSettings.sandboxAllowLocalBinding) sandbox.allowLocalBinding = projectSettings.sandboxAllowLocalBinding === "true";
+      if (projectSettings.sandboxExcludedCommands.length > 0) sandbox.excludedCommands = projectSettings.sandboxExcludedCommands;
+      if (Object.keys(sandbox).length > 0) {
+        settingsJson.sandbox = sandbox;
+      }
+      if (projectSettings.defaultModel) {
+        settingsJson.defaultModel = projectSettings.defaultModel;
+      }
+    }
+
+    // Group hooks by event, then by matcher
+    if (projectHooks.length > 0) {
+      const hooksMap: Record<string, Array<{ matcher: string; hooks: Array<Record<string, unknown>> }>> = {};
+      for (const hook of projectHooks) {
+        if (!hooksMap[hook.event]) hooksMap[hook.event] = [];
+        const entry: Record<string, unknown> = { type: hook.handlerType };
+        if (hook.handlerType === "command" && hook.command) entry.command = hook.command;
+        if (hook.handlerType === "prompt" && hook.prompt) entry.prompt = hook.prompt;
+        if (hook.timeout != null) entry.timeout = hook.timeout;
+        if (hook.statusMessage) entry.statusMessage = hook.statusMessage;
+        if (hook.isAsync === "true") entry.async = true;
+        if (hook.once === "true") entry.once = true;
+
+        const existing = hooksMap[hook.event].find((g) => g.matcher === hook.matcher);
+        if (existing) {
+          existing.hooks.push(entry);
+        } else {
+          hooksMap[hook.event].push({ matcher: hook.matcher, hooks: [entry] });
+        }
+      }
+      settingsJson.hooks = hooksMap;
+    }
+
+    if (Object.keys(settingsJson).length > 0) {
+      archive.append(JSON.stringify(settingsJson, null, 2), { name: ".claude/settings.json" });
+    }
 
     for (const { agent, skills: agentSkills, commands: agentCommands } of agentList) {
       const slug = agent.name.toLowerCase().replace(/\s+/g, "-");
       let agentMd = "---\n";
       agentMd += `name: ${slug}\n`;
       agentMd += `description: ${agent.description}\n`;
-      agentMd += `memory: ${agent.memoryScope}\n`;
       if (agent.tools.length > 0) {
         agentMd += `tools: ${agent.tools.join(", ")}\n`;
       }
-      agentMd += `model: ${agent.model}\n`;
+      if (agent.disallowedTools.length > 0) {
+        agentMd += `disallowedTools: ${agent.disallowedTools.join(", ")}\n`;
+      }
+      if (agent.model !== "inherit") {
+        agentMd += `model: ${agent.model}\n`;
+      }
+      agentMd += `memory: ${agent.memoryScope}\n`;
+      if (agent.permissionMode !== "default") {
+        agentMd += `permissionMode: ${agent.permissionMode}\n`;
+      }
+      if (agent.maxTurns != null) {
+        agentMd += `maxTurns: ${agent.maxTurns}\n`;
+      }
+      if (agent.preloadedSkills.length > 0) {
+        agentMd += `skills:\n`;
+        for (const s of agent.preloadedSkills) {
+          agentMd += `  - ${s}\n`;
+        }
+      }
       agentMd += "---\n\n";
       agentMd += agent.systemPrompt;
       archive.append(agentMd, { name: `.claude/agents/${slug}.md` });
@@ -199,9 +382,26 @@ export async function registerRoutes(
         let skillMd = "---\n";
         skillMd += `name: ${skillSlug}\n`;
         skillMd += `description: ${skill.description}\n`;
-        skillMd += `context: ${skill.context}\n`;
+        if (skill.context !== "main") {
+          skillMd += `context: ${skill.context}\n`;
+        }
+        if (skill.context === "fork" && skill.agentType !== "general-purpose") {
+          skillMd += `agent: ${skill.agentType}\n`;
+        }
         if (skill.allowedTools.length > 0) {
           skillMd += `allowed-tools: ${skill.allowedTools.join(", ")}\n`;
+        }
+        if (skill.argumentHint) {
+          skillMd += `argument-hint: "${skill.argumentHint}"\n`;
+        }
+        if (skill.disableModelInvocation === "true") {
+          skillMd += `disable-model-invocation: true\n`;
+        }
+        if (skill.userInvocable === "false") {
+          skillMd += `user-invocable: false\n`;
+        }
+        if (skill.model) {
+          skillMd += `model: ${skill.model}\n`;
         }
         skillMd += "---\n\n";
         skillMd += skill.instructions;
@@ -211,6 +411,27 @@ export async function registerRoutes(
       for (const cmd of agentCommands) {
         let cmdMd = "---\n";
         cmdMd += `description: ${cmd.description}\n`;
+        if (cmd.argumentHint) {
+          cmdMd += `argument-hint: "${cmd.argumentHint}"\n`;
+        }
+        if (cmd.disableModelInvocation === "true") {
+          cmdMd += `disable-model-invocation: true\n`;
+        }
+        if (cmd.userInvocable === "false") {
+          cmdMd += `user-invocable: false\n`;
+        }
+        if (cmd.model) {
+          cmdMd += `model: ${cmd.model}\n`;
+        }
+        if (cmd.context) {
+          cmdMd += `context: ${cmd.context}\n`;
+        }
+        if (cmd.context === "fork" && cmd.agentType) {
+          cmdMd += `agent: ${cmd.agentType}\n`;
+        }
+        if (cmd.allowedTools.length > 0) {
+          cmdMd += `allowed-tools: ${cmd.allowedTools.join(", ")}\n`;
+        }
         cmdMd += "---\n\n";
         cmdMd += cmd.promptTemplate;
         archive.append(cmdMd, { name: `.claude/commands/${cmd.name}.md` });

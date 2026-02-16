@@ -18,7 +18,10 @@ export async function seedDatabase() {
 Always reference specific line numbers and provide concrete improvement suggestions. Be thorough but constructive.`,
     model: "sonnet",
     tools: ["Read", "Glob", "Grep"],
+    disallowedTools: ["Write", "Edit"],
     memoryScope: "project",
+    permissionMode: "acceptEdits",
+    maxTurns: 20,
     icon: "shield",
     color: "#8b5cf6",
   });
@@ -38,6 +41,8 @@ Focus on high-level design rather than implementation details. Consider scalabil
     model: "opus",
     tools: ["Read", "Glob", "Grep", "Bash"],
     memoryScope: "user",
+    permissionMode: "plan",
+    maxTurns: 50,
     icon: "layers",
     color: "#3b82f6",
   });
@@ -57,6 +62,7 @@ Use the project's existing test framework. Focus on testing behavior, not implem
     model: "sonnet",
     tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
     memoryScope: "project",
+    permissionMode: "acceptEdits",
     icon: "terminal",
     color: "#22c55e",
   });
@@ -79,6 +85,7 @@ Use the project's existing test framework. Focus on testing behavior, not implem
 Provide findings as a severity-ranked list with remediation steps.`,
     context: "fork",
     allowedTools: ["Read", "Grep", "Glob"],
+    argumentHint: "[file-path]",
   });
 
   await storage.createSkill({
@@ -105,6 +112,7 @@ What is the change that we're proposing and/or doing?
 What becomes easier or more difficult to do because of this change?`,
     context: "main",
     allowedTools: ["Read", "Write"],
+    argumentHint: "[topic]",
   });
 
   await storage.createCommand({
@@ -119,6 +127,7 @@ What becomes easier or more difficult to do because of this change?`,
 5. Test coverage
 
 Provide a summary with severity ratings (critical/major/minor) for each finding.`,
+    argumentHint: "[PR-number]",
   });
 
   await storage.createCommand({
@@ -132,6 +141,8 @@ Provide a summary with severity ratings (critical/major/minor) for each finding.
 - Mock setup for external dependencies
 
 Use descriptive test names that explain the expected behavior.`,
+    argumentHint: "[file-path]",
+    context: "fork",
   });
 
   await storage.createFileMapEntry({
@@ -188,6 +199,63 @@ A full-stack web application with React frontend and Express backend.
   await storage.addProjectAgent({ projectId: project.id, agentId: codeReviewer.id });
   await storage.addProjectAgent({ projectId: project.id, agentId: architect.id });
   await storage.addProjectAgent({ projectId: project.id, agentId: testWriter.id });
+
+  // Rules
+  await storage.createRule({
+    projectId: project.id,
+    name: "TypeScript Conventions",
+    paths: ["src/**/*.ts", "src/**/*.tsx"],
+    content: `## TypeScript Conventions
+
+- Use strict mode with all strict compiler options enabled
+- Prefer \`interface\` over \`type\` for object shapes
+- Use explicit return types on exported functions
+- Prefer \`const\` assertions for literal types
+- Use barrel exports (index.ts) for module boundaries
+- Avoid \`any\` — use \`unknown\` and narrow with type guards`,
+    sortOrder: 0,
+  });
+
+  await storage.createRule({
+    projectId: project.id,
+    name: "Testing Standards",
+    paths: ["tests/**"],
+    content: `## Testing Standards
+
+- Use descriptive test names: "should [expected behavior] when [condition]"
+- One assertion per test when practical
+- Use factories/fixtures instead of inline test data
+- Mock external dependencies at the boundary
+- Aim for >80% branch coverage on business logic`,
+    sortOrder: 1,
+  });
+
+  // Project Settings
+  await storage.upsertProjectSettings(project.id, {
+    permissionAllow: ["Read", "Glob", "Grep"],
+    defaultModel: "sonnet",
+  });
+
+  // Hooks
+  await storage.createHook({
+    projectId: project.id,
+    event: "PreToolUse",
+    matcher: "Bash(git commit*)",
+    handlerType: "command",
+    command: "npm run lint",
+    statusMessage: "Running linter...",
+    sortOrder: 0,
+  });
+
+  await storage.createHook({
+    projectId: project.id,
+    event: "PreToolUse",
+    matcher: "Bash(git push*)",
+    handlerType: "command",
+    command: "npx tsc --noEmit",
+    statusMessage: "Type-checking...",
+    sortOrder: 1,
+  });
 
   console.log("Database seeded successfully");
 }
