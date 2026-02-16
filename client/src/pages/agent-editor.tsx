@@ -4,7 +4,7 @@ import { useRoute, useLocation } from "wouter";
 import {
   ArrowLeft, Save, FileText, Puzzle, Terminal as TerminalIcon,
   FolderTree, Plus, Trash2, GripVertical, ChevronRight, Folder, File, Eye,
-  ChevronDown, Copy, Check, Download
+  ChevronDown, Copy, Check, Download, Loader2, Globe
 } from "lucide-react";
 import type { Agent, Skill, Command, FileMapEntry, InsertAgent, McpServer, ProjectAgent } from "@shared/schema";
 import { AVAILABLE_TOOLS, AVAILABLE_MODELS, MEMORY_SCOPES, PERMISSION_MODES } from "@shared/schema";
@@ -49,6 +49,7 @@ import { FieldTooltip } from "@/components/field-tooltip";
 import { HelpSection } from "@/components/help-section";
 import { toolDescriptions } from "@/data/tool-descriptions";
 import { skillCatalog } from "@/data/skill-catalog";
+import { communitySkills } from "@/data/community-skills";
 
 const TOOL_BUNDLES = [
   { value: "readonly", label: "Read-Only", description: "Can read and search files", tools: ["Read", "Glob", "Grep"] },
@@ -1135,6 +1136,8 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
   const [showNew, setShowNew] = useState(false);
   const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogTab, setCatalogTab] = useState<"builtin" | "community">("builtin");
+  const [fetchingSlug, setFetchingSlug] = useState<string | null>(null);
 
   const emptySkillForm = {
     name: "",
@@ -1191,6 +1194,35 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
     },
   });
 
+  const fetchCommunitySkill = async (owner: string, repo: string, slug: string) => {
+    setFetchingSlug(slug);
+    try {
+      const res = await fetch(`/api/github/skills/${owner}/${repo}/${slug}`, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to fetch skill" }));
+        throw new Error(err.error || "Failed to fetch skill");
+      }
+      const data = await res.json();
+      setNewSkill((prev) => ({
+        ...prev,
+        name: data.name || slug,
+        description: data.description || "",
+        instructions: data.instructions || "",
+        context: "main",
+        allowedTools: [],
+      }));
+      toast({ title: "Skill loaded from GitHub" });
+    } catch (err) {
+      toast({
+        title: "Failed to fetch skill",
+        description: err instanceof Error ? err.message : "Network error",
+        variant: "destructive",
+      });
+    } finally {
+      setFetchingSlug(null);
+    }
+  };
+
   const startEditing = (skill: Skill) => {
     setEditingSkillId(skill.id);
     setEditForm({
@@ -1206,6 +1238,16 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
       userInvocable: skill.userInvocable,
     });
   };
+
+  const filteredBuiltinSkills = skillCatalog.filter((s) => {
+    const q = catalogSearch.toLowerCase();
+    return !q || s.name.includes(q) || s.description.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
+  });
+
+  const filteredCommunitySkills = communitySkills.filter((s) => {
+    const q = catalogSearch.toLowerCase();
+    return !q || s.name.toLowerCase().includes(q) || s.slug.includes(q) || s.description.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
+  });
 
   return (
     <div className="space-y-4">
@@ -1230,19 +1272,44 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
                 <Label className="text-sm font-medium">Browse Catalog</Label>
                 <span className="text-xs text-muted-foreground">— click to populate form</span>
               </div>
+              <div className="flex gap-1 border-b">
+                <button
+                  type="button"
+                  onClick={() => setCatalogTab("builtin")}
+                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                    catalogTab === "builtin"
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="tab-builtin-skills"
+                >
+                  <Puzzle className="h-3 w-3 inline mr-1" />
+                  Built-in Templates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatalogTab("community")}
+                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                    catalogTab === "community"
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="tab-community-skills"
+                >
+                  <Globe className="h-3 w-3 inline mr-1" />
+                  Community Skills
+                  <Badge variant="secondary" className="ml-1.5 text-[9px] px-1 py-0">{communitySkills.length}</Badge>
+                </button>
+              </div>
               <Input
                 placeholder="Search skills..."
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
                 data-testid="input-catalog-search"
               />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[200px] overflow-auto">
-                {skillCatalog
-                  .filter((s) => {
-                    const q = catalogSearch.toLowerCase();
-                    return !q || s.name.includes(q) || s.description.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
-                  })
-                  .map((cat) => (
+              {catalogTab === "builtin" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[200px] overflow-auto">
+                  {filteredBuiltinSkills.map((cat) => (
                     <button
                       key={cat.name}
                       type="button"
@@ -1264,7 +1331,36 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
                       <span className="text-muted-foreground line-clamp-1">{cat.description}</span>
                     </button>
                   ))}
-              </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[280px] overflow-auto">
+                  {filteredCommunitySkills.map((cs) => (
+                    <button
+                      key={`${cs.repo.owner}/${cs.repo.name}/${cs.slug}`}
+                      type="button"
+                      disabled={fetchingSlug !== null}
+                      className="flex flex-col items-start gap-0.5 p-2 rounded-md border text-left text-xs hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => fetchCommunitySkill(cs.repo.owner, cs.repo.name, cs.slug)}
+                      data-testid={`community-skill-${cs.slug}`}
+                    >
+                      <div className="flex items-center gap-1.5 w-full">
+                        <span className="font-medium truncate">{cs.name}</span>
+                        {fetchingSlug === cs.slug && (
+                          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                        )}
+                      </div>
+                      <span className="text-muted-foreground line-clamp-1">{cs.description}</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Badge variant="outline" className="text-[9px] px-1 py-0">{cs.repo.label}</Badge>
+                        <Badge variant="secondary" className="text-[9px] px-1 py-0">{cs.category}</Badge>
+                      </div>
+                    </button>
+                  ))}
+                  {filteredCommunitySkills.length === 0 && (
+                    <p className="text-xs text-muted-foreground col-span-2 py-4 text-center">No matching community skills</p>
+                  )}
+                </div>
+              )}
             </div>
             <Separator />
             <SkillFormFields form={newSkill} setForm={setNewSkill} />
@@ -1274,6 +1370,7 @@ function SkillsTab({ agentId, skills }: { agentId: string; skills: Skill[] }) {
                 onClick={() => {
                   setShowNew(false);
                   setNewSkill({ ...emptySkillForm, allowedTools: [] });
+                  setCatalogTab("builtin");
                 }}
                 data-testid="button-cancel-skill"
               >

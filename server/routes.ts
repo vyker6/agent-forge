@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import archiver from "archiver";
 import multer from "multer";
+import matter from "gray-matter";
 import { storage } from "./storage";
 import { parseZipBuffer, importFiles, parseMarkdownContent } from "./import-parser";
 import {
@@ -724,6 +725,59 @@ export async function registerRoutes(
   app.get("/api/likes", async (_req, res) => {
     const counts = await storage.getLikeCounts();
     res.json(counts);
+  });
+
+  // GitHub community skills proxy
+  const githubSkillCache = new Map<string, { data: unknown; expiresAt: number }>();
+
+  function getSkillPath(owner: string, repo: string, skillName: string): string {
+    if (owner === "trailofbits" && repo === "skills") {
+      return `plugins/${skillName}/skills/${skillName}/SKILL.md`;
+    }
+    return `skills/${skillName}/SKILL.md`;
+  }
+
+  const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+
+  app.get("/api/github/skills/:owner/:repo/:skillName", async (req, res) => {
+    const { owner, repo, skillName } = req.params;
+
+    if (!SAFE_NAME_RE.test(owner) || !SAFE_NAME_RE.test(repo) || !SAFE_NAME_RE.test(skillName)) {
+      return res.status(400).json({ error: "Invalid parameter format" });
+    }
+
+    const cacheKey = `${owner}/${repo}/${skillName}`;
+    const cached = githubSkillCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return res.json(cached.data);
+    }
+
+    const path = getSkillPath(owner, repo, skillName);
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/refs/heads/main/${path}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        if (response.status === 404) {
+          return res.status(404).json({ error: "Skill not found" });
+        }
+        return res.status(503).json({ error: "Failed to fetch skill from GitHub" });
+      }
+
+      const raw = await response.text();
+      const { data: frontmatter, content } = matter(raw);
+
+      const result = {
+        name: frontmatter.name || skillName,
+        description: frontmatter.description || "",
+        instructions: content.trim(),
+      };
+
+      githubSkillCache.set(cacheKey, { data: result, expiresAt: Date.now() + 5 * 60 * 1000 });
+      res.json(result);
+    } catch {
+      res.status(503).json({ error: "Network error fetching skill from GitHub" });
+    }
   });
 
   // AI generation endpoints
