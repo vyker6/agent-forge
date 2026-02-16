@@ -6,12 +6,14 @@ import {
   insertRuleSchema,
   insertProjectSettingsSchema,
   insertHookSchema,
+  insertMcpServerSchema,
   PERMISSION_MODES,
   AVAILABLE_MODELS,
   AVAILABLE_TOOLS,
   AGENT_ICONS,
   HOOK_EVENTS,
   HOOK_HANDLER_TYPES,
+  MCP_SERVER_TEMPLATES,
 } from '../../shared/schema';
 
 describe('Schema', () => {
@@ -25,6 +27,18 @@ describe('Schema', () => {
         color: '#FF0000',
       });
       expect(result.success).toBe(true);
+    });
+
+    it('accepts agent data with mcpServers', () => {
+      const result = insertAgentSchema.safeParse({
+        name: 'MCP Agent',
+        description: 'Agent with MCP servers',
+        mcpServers: ['github', 'filesystem'],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mcpServers).toEqual(['github', 'filesystem']);
+      }
     });
 
     it('requires name field', () => {
@@ -141,6 +155,35 @@ describe('Schema', () => {
     });
   });
 
+  describe('insertMcpServerSchema', () => {
+    it('accepts valid MCP server data', () => {
+      const result = insertMcpServerSchema.safeParse({
+        projectId: 'some-uuid',
+        name: 'github',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-github'],
+        env: { GITHUB_PERSONAL_ACCESS_TOKEN: '' },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('requires projectId and name and command', () => {
+      const result = insertMcpServerSchema.safeParse({
+        name: 'github',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts minimal data with defaults', () => {
+      const result = insertMcpServerSchema.safeParse({
+        projectId: 'some-uuid',
+        name: 'test-server',
+        command: 'node',
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('Constants', () => {
     it('exports PERMISSION_MODES with default option', () => {
       const defaultMode = PERMISSION_MODES.find((m) => m.value === 'default');
@@ -176,6 +219,19 @@ describe('Schema', () => {
       expect(HOOK_HANDLER_TYPES.length).toBe(2);
       expect(HOOK_HANDLER_TYPES.find((t) => t.value === 'command')).toBeDefined();
       expect(HOOK_HANDLER_TYPES.find((t) => t.value === 'prompt')).toBeDefined();
+    });
+
+    it('exports MCP_SERVER_TEMPLATES with correct structure', () => {
+      expect(MCP_SERVER_TEMPLATES.length).toBe(4);
+      const github = MCP_SERVER_TEMPLATES.find((t) => t.name === 'github');
+      expect(github).toBeDefined();
+      expect(github?.command).toBe('npx');
+      expect(github?.label).toBe('GitHub');
+      expect(github?.args).toContain('-y');
+
+      const filesystem = MCP_SERVER_TEMPLATES.find((t) => t.name === 'filesystem');
+      expect(filesystem).toBeDefined();
+      expect(filesystem?.label).toBe('Filesystem');
     });
   });
 });

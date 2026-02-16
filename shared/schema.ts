@@ -15,6 +15,7 @@ export const agents = pgTable("agents", {
   permissionMode: text("permission_mode").notNull().default("default"),
   maxTurns: integer("max_turns"),
   preloadedSkills: text("preloaded_skills").array().notNull().default(sql`ARRAY[]::text[]`),
+  mcpServers: text("mcp_servers").array().notNull().default(sql`ARRAY[]::text[]`),
   icon: text("icon").notNull().default("bot"),
   color: text("color").notNull().default("#3b82f6"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -66,6 +67,13 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   claudeMdContent: text("claude_md_content").notNull().default(""),
+  pluginVersion: text("plugin_version").notNull().default(""),
+  pluginAuthorName: text("plugin_author_name").notNull().default(""),
+  pluginAuthorEmail: text("plugin_author_email").notNull().default(""),
+  pluginHomepage: text("plugin_homepage").notNull().default(""),
+  pluginRepository: text("plugin_repository").notNull().default(""),
+  pluginLicense: text("plugin_license").notNull().default("MIT"),
+  pluginKeywords: text("plugin_keywords").array().notNull().default(sql`ARRAY[]::text[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -116,6 +124,18 @@ export const hooks = pgTable("hooks", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const mcpServers = pgTable("mcp_servers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  command: text("command").notNull(),
+  args: text("args").array().notNull().default(sql`ARRAY[]::text[]`),
+  env: jsonb("env").notNull().default({}),
+  cwd: text("cwd").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertAgentSchema = createInsertSchema(agents).omit({ id: true, createdAt: true });
 export const insertSkillSchema = createInsertSchema(skills).omit({ id: true, createdAt: true });
 export const insertCommandSchema = createInsertSchema(commands).omit({ id: true, createdAt: true });
@@ -147,6 +167,10 @@ export type ProjectSettings = typeof projectSettings.$inferSelect;
 export const insertHookSchema = createInsertSchema(hooks).omit({ id: true, createdAt: true });
 export type InsertHook = z.infer<typeof insertHookSchema>;
 export type Hook = typeof hooks.$inferSelect;
+
+export const insertMcpServerSchema = createInsertSchema(mcpServers).omit({ id: true, createdAt: true });
+export type InsertMcpServer = z.infer<typeof insertMcpServerSchema>;
+export type McpServer = typeof mcpServers.$inferSelect;
 
 export const AVAILABLE_TOOLS = [
   "Read", "Write", "Edit", "Bash", "Glob", "Grep",
@@ -202,4 +226,11 @@ export const HOOK_EVENTS = [
 export const HOOK_HANDLER_TYPES = [
   { value: "command", label: "Shell Command" },
   { value: "prompt", label: "Prompt" },
+] as const;
+
+export const MCP_SERVER_TEMPLATES = [
+  { label: "GitHub", name: "github", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: { GITHUB_PERSONAL_ACCESS_TOKEN: "" } },
+  { label: "Filesystem", name: "filesystem", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/directory"], env: {} },
+  { label: "PostgreSQL", name: "postgres", command: "npx", args: ["-y", "@modelcontextprotocol/server-postgres"], env: { POSTGRES_CONNECTION_STRING: "" } },
+  { label: "Brave Search", name: "brave-search", command: "npx", args: ["-y", "@modelcontextprotocol/server-brave-search"], env: { BRAVE_API_KEY: "" } },
 ] as const;

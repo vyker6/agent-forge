@@ -257,5 +257,24 @@ A full-stack web application with React frontend and Express backend.
     sortOrder: 1,
   });
 
+  // MCP Servers
+  await storage.createMcpServer({
+    projectId: project.id,
+    name: "github",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-github"],
+    env: { GITHUB_PERSONAL_ACCESS_TOKEN: "" },
+    sortOrder: 0,
+  });
+
+  await storage.createMcpServer({
+    projectId: project.id,
+    name: "filesystem",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/directory"],
+    env: {},
+    sortOrder: 1,
+  });
+
   console.log("Database seeded successfully");
 }
