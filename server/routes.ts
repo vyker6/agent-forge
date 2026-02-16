@@ -611,12 +611,12 @@ export async function registerRoutes(
       res.json(result);
     } catch (err: unknown) {
       const status = (err as { status?: number }).status;
-      if (status === 401 || status === 403) {
+      const message = err instanceof Error ? err.message : "Generation failed";
+      if (status === 401 || status === 403 || message.includes("authentication_error") || message.startsWith("401")) {
         return res.status(502).json({
-          error: "API key is invalid or expired — check your ANTHROPIC_API_KEY",
+          error: "API key is invalid or expired — check your ANTHROPIC_API_KEY secret",
         });
       }
-      const message = err instanceof Error ? err.message : "Generation failed";
       res.status(422).json({ error: message });
     }
   });

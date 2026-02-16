@@ -2,13 +2,17 @@ import Anthropic from "@anthropic-ai/sdk";
 import { AGENT_GENERATION_SYSTEM_PROMPT } from "./ai-prompts";
 import { insertAgentSchema } from "@shared/schema";
 
-const client = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  : null;
-
+let client: Anthropic | null = null;
 let keyValid = false;
 
+function createClient(): Anthropic | null {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  return new Anthropic({ apiKey: key });
+}
+
 async function validateKey(): Promise<boolean> {
+  client = createClient();
   if (!client) return false;
   try {
     await client.messages.create({
@@ -19,16 +23,17 @@ async function validateKey(): Promise<boolean> {
     return true;
   } catch (err: unknown) {
     const status = (err as { status?: number }).status;
-    if (status === 401 || status === 403) {
-      console.warn(`[ai] API key validation failed (${status}) — AI features disabled`);
+    const message = err instanceof Error ? err.message : "";
+    if (status === 401 || status === 403 || message.includes("authentication_error")) {
+      console.warn(`[ai] API key validation failed — AI features disabled. Check your ANTHROPIC_API_KEY secret.`);
       return false;
     }
-    // Other errors (network, rate limit) — assume key is valid
     return true;
   }
 }
 
 export async function initAi(): Promise<void> {
+  client = createClient();
   if (!client) {
     console.log("[ai] No ANTHROPIC_API_KEY set — AI features disabled");
     return;
